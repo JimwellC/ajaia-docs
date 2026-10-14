@@ -1,144 +1,133 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
 import Toolbar from "./Toolbar";
-import SharePanel, { type Collaborator } from "./SharePanel";
+import SharePanel from "./SharePanel";
+import { useDocumentSaver, type SaveState } from "./useDocumentSaver";
+import { api } from "@/lib/api";
 import type { Role } from "@/lib/access";
-
-type SaveState = "saved" | "dirty" | "saving" | "error";
-const AUTOSAVE_MS = 800;
+import type { Collaborator } from "@/server/repo";
 
 interface Props {
-  doc: { id: string; title: string; content: string; ownerName: string; collaborators: Collaborator[] };
+  doc: {
+    id: string;
+    title: string;
+    content: string;
+    version: number;
+    ownerName: string;
+    collaborators: Collaborator[];
+  };
   role: Role;
 }
 
-export default function DocumentEditor({ doc, role }: Props) {
-  const [title, setTitle] = useState(doc.title);
-  const [savedTitle, setSavedTitle] = useState(doc.title);
-  const [titleError, setTitleError] = useState("");
-  const [saveState, setSaveState] = useState<SaveState>("saved");
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inFlight = useRef<Promise<void> | null>(null);
-  const pendingContent = useRef<string | null>(null);
+const STATUS: Record<SaveState, string> = {
+  saved: "All changes saved",
+  dirty: "Unsaved changes",
+  saving: "Saving…",
+  error: "Couldn't save.",
+  conflict: "Not saved: edit conflict",
+};
 
-  // Save the latest content. Saves run one at a time so an older request can't overwrite a newer one.
-  const flush = useCallback(async () => {
-    if (inFlight.current) await inFlight.current;
-    const content = pendingContent.current;
-    if (content === null) return;
-    pendingContent.current = null;
-    setSaveState("saving");
-    inFlight.current = (async () => {
-      try {
-        const res = await fetch(`/api/documents/${doc.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
-        });
-        if (!res.ok) throw new Error();
-        setSaveState(pendingContent.current === null ? "saved" : "dirty");
-      } catch {
-        // Keep the unsaved content so "Retry" can resend it.
-        if (pendingContent.current === null) pendingContent.current = content;
-        setSaveState("error");
-      } finally {
-        inFlight.current = null;
-      }
-    })();
-    await inFlight.current;
-  }, [doc.id]);
+export default function DocumentEditor({ doc, role }: Props) {
+  const router = useRouter();
+  const readOnly = role === "viewer";
+  const [title, setTitle] = useState(doc.title);
+  const [titleError, setTitleError] = useState("");
+  const saver = useDocumentSaver(doc.id, doc.version);
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
-      Placeholder.configure({ placeholder: "Start writing…" }),
+      Placeholder.configure({ placeholder: readOnly ? "" : "Start writing…" }),
     ],
     content: doc.content,
+    editable: !readOnly,
     immediatelyRender: false,
-    editorProps: { attributes: { class: "doc-content" } },
-    onUpdate: ({ editor }) => {
-      pendingContent.current = editor.getHTML();
-      setSaveState("dirty");
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(flush, AUTOSAVE_MS);
-    },
+    editorProps: { attributes: { class: "doc-content", "aria-label": "Document content" } },
+    onUpdate: ({ editor }) => saver.schedule({ content: editor.getHTML() }),
   });
 
-  // Warn before leaving with unsaved changes, and flush on unmount.
-  useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (pendingContent.current !== null || inFlight.current) e.preventDefault();
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", onBeforeUnload);
-      if (timer.current) clearTimeout(timer.current);
-      void flush();
-    };
-  }, [flush]);
-
-  async function saveTitle() {
+  function commitTitle() {
     const next = title.trim();
-    if (next === savedTitle) return setTitle(savedTitle);
     if (!next) {
       setTitleError("Title cannot be empty.");
-      return setTitle(savedTitle);
+      return;
     }
     setTitleError("");
-    const res = await fetch(`/api/documents/${doc.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: next }),
-    });
-    if (res.ok) {
-      setSavedTitle(next);
-      setTitle(next);
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setTitleError(data.error ?? "Could not rename the document.");
-      setTitle(savedTitle);
-    }
+    if (next !== title) setTitle(next);
+    saver.schedule({ title: next }, 0);
   }
 
-  const statusText: Record<SaveState, string> = {
-    saved: "All changes saved",
-    dirty: "Unsaved changes",
-    saving: "Saving…",
-    error: "Couldn't save.",
-  };
+  function useTheirs() {
+    const latest = saver.acceptTheirs();
+    if (!latest) return;
+    setTitle(latest.title);
+    editor?.commands.setContent(latest.content, false);
+  }
+
+  function keepMine() {
+    saver.keepMine({ title: title.trim() || doc.title, content: editor?.getHTML() ?? "" });
+  }
 
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-6 py-6 lg:grid-cols-[1fr_280px]">
       <div className="min-w-0">
         <div className="mb-3 flex items-center justify-between gap-3 text-sm">
           <Link href="/" className="text-stone-600 hover:text-stone-900">← All documents</Link>
-          <span className={saveState === "error" ? "text-red-600" : "text-stone-500"} aria-live="polite">
-            {statusText[saveState]}{" "}
-            {saveState === "error" && (
-              <button className="underline" onClick={() => void flush()}>Retry</button>
-            )}
-          </span>
+          {!readOnly && (
+            <span
+              className={saver.state === "error" || saver.state === "conflict" ? "text-red-600" : "text-stone-500"}
+              aria-live="polite"
+            >
+              {saver.state === "error" ? saver.error || STATUS.error : STATUS[saver.state]}{" "}
+              {saver.state === "error" && (
+                <button className="underline" onClick={() => void saver.flush()}>Retry</button>
+              )}
+            </span>
+          )}
         </div>
+
+        {saver.state === "conflict" && (
+          <div role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p className="font-medium">Someone else saved changes to this document while you were editing.</p>
+            <p className="mt-1">Your latest changes are not saved yet. Choose which version to keep:</p>
+            <div className="mt-2 flex gap-2">
+              <button onClick={useTheirs} className="rounded-md border border-amber-400 bg-white px-3 py-1">
+                Load their version
+              </button>
+              <button onClick={keepMine} className="rounded-md bg-amber-900 px-3 py-1 text-white">
+                Keep mine
+              </button>
+            </div>
+          </div>
+        )}
 
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onBlur={saveTitle}
+          onBlur={readOnly ? undefined : commitTitle}
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+          readOnly={readOnly}
           maxLength={120}
           aria-label="Document title"
-          className="w-full rounded-md bg-transparent px-1 text-2xl font-bold outline-none hover:bg-white focus:bg-white focus:ring-2 focus:ring-stone-300"
+          className="w-full rounded-md bg-transparent px-1 text-2xl font-bold outline-none read-only:cursor-default hover:bg-white focus:bg-white focus:ring-2 focus:ring-stone-300 read-only:hover:bg-transparent read-only:focus:ring-0"
         />
         {titleError && <p className="mt-1 text-sm text-red-600" role="alert">{titleError}</p>}
 
         <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
-          <Toolbar editor={editor} />
+          {readOnly ? (
+            <div className="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600">
+              View only. Ask {doc.ownerName} for edit access.
+            </div>
+          ) : (
+            <Toolbar editor={editor} />
+          )}
           <div className="px-8 py-6 sm:px-12">
             <EditorContent editor={editor} />
           </div>
@@ -149,12 +138,53 @@ export default function DocumentEditor({ doc, role }: Props) {
         <div className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
           <p className="text-stone-500">Owner</p>
           <p className="font-medium">{role === "owner" ? "You" : doc.ownerName}</p>
-          {role === "editor" && (
-            <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-amber-800">Shared with you · you can edit</p>
+          {role !== "owner" && (
+            <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-amber-800">
+              Shared with you · {role === "editor" ? "can edit" : "can view"}
+            </p>
+          )}
+          {role === "owner" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <DeleteButton docId={doc.id} onDeleted={() => router.push("/")} />
+            </div>
           )}
         </div>
-        <SharePanel docId={doc.id} isOwner={role === "owner"} initial={doc.collaborators} />
+        {role === "owner" && <SharePanel docId={doc.id} initial={doc.collaborators} />}
       </aside>
     </main>
+  );
+}
+
+function DeleteButton({ docId, onDeleted }: { docId: string; onDeleted: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function remove() {
+    setBusy(true);
+    try {
+      await api(`/api/documents/${docId}`, { method: "DELETE" });
+      onDeleted();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  if (!confirming)
+    return (
+      <button onClick={() => setConfirming(true)} className="rounded-md border border-stone-300 px-3 py-1.5 text-red-700 hover:bg-red-50">
+        Delete
+      </button>
+    );
+  return (
+    <span className="flex w-full flex-wrap items-center gap-2">
+      <span className="text-stone-600">Delete for everyone?</span>
+      <button disabled={busy} onClick={remove} className="rounded-md bg-red-700 px-3 py-1.5 text-white disabled:opacity-60">
+        {busy ? "Deleting…" : "Delete"}
+      </button>
+      <button onClick={() => setConfirming(false)} className="underline">Cancel</button>
+      {error && <span className="w-full text-red-600">{error}</span>}
+    </span>
   );
 }

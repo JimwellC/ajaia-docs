@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
-import { canManage, canView } from "@/lib/access";
-import { getDocument, removeShare } from "@/lib/documents";
-import { jsonError, requireUser } from "@/lib/http";
+import { requireUser } from "@/server/auth";
+import { changeShareRole, removeShare } from "@/server/documents";
+import { readJson, route } from "@/server/handler";
+import { parse, updateShareSchema } from "@/server/validation";
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string; userId: string }> }) {
-  const { user, response } = await requireUser();
-  if (response) return response;
+type Ctx = { params: Promise<{ id: string; userId: string }> };
+
+export const PATCH = route<Ctx>(async (req, { params }) => {
+  const user = await requireUser(req);
   const { id, userId } = await params;
-  const doc = await getDocument(id);
-  if (!doc || !canView(doc, user.id)) return jsonError(404, "Document not found.");
-  if (!canManage(doc, user.id)) return jsonError(403, "Only the owner can change sharing.");
-  await removeShare(id, userId);
+  const { role } = parse(updateShareSchema, await readJson(req));
+  await changeShareRole(id, user.id, userId, role);
   return NextResponse.json({ ok: true });
-}
+});
+
+export const DELETE = route<Ctx>(async (req, { params }) => {
+  const user = await requireUser(req);
+  const { id, userId } = await params;
+  await removeShare(id, user.id, userId);
+  return new NextResponse(null, { status: 204 });
+});

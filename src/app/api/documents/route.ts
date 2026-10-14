@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
-import { createDocument, listDocuments, MAX_TITLE } from "@/lib/documents";
-import { jsonError, requireUser } from "@/lib/http";
+import { requireUser } from "@/server/auth";
+import { createDocument, listDocuments } from "@/server/documents";
+import { readJson, route } from "@/server/handler";
+import { createDocumentSchema, parse } from "@/server/validation";
 
-export async function GET() {
-  const { user, response } = await requireUser();
-  if (response) return response;
+export const GET = route(async (req) => {
+  const user = await requireUser(req);
   return NextResponse.json(await listDocuments(user.id));
-}
+});
 
-export async function POST(req: Request) {
-  const { user, response } = await requireUser();
-  if (response) return response;
-  const body = await req.json().catch(() => ({}));
-  const title = typeof body?.title === "string" ? body.title.trim() : "";
-  if (title.length > MAX_TITLE) return jsonError(400, `Title must be ${MAX_TITLE} characters or fewer.`);
-  const id = await createDocument(user.id, title || undefined);
-  return NextResponse.json({ id }, { status: 201 });
-}
+export const POST = route(async (req) => {
+  const user = await requireUser(req);
+  const { title } = parse(createDocumentSchema, await readJson(req));
+  return NextResponse.json({ id: await createDocument(user.id, title) }, { status: 201 });
+});

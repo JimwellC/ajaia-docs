@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { api } from "@/lib/api";
 
 const ACCEPT = ".txt,.md,.docx";
 
@@ -13,11 +14,11 @@ export default function CreateActions() {
   async function createBlank() {
     setBusy("new");
     setError("");
-    const res = await fetch("/api/documents", { method: "POST", body: "{}", headers: { "Content-Type": "application/json" } });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) router.push(`/docs/${data.id}`);
-    else {
-      setError(data.error ?? "Could not create document.");
+    try {
+      const { id } = await api<{ id: string }>("/api/documents", { method: "POST", json: {} });
+      router.push(`/docs/${id}`);
+    } catch (e) {
+      setError((e as Error).message);
       setBusy(null);
     }
   }
@@ -27,11 +28,11 @@ export default function CreateActions() {
     setError("");
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/import", { method: "POST", body: form });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) router.push(`/docs/${data.id}`);
-    else {
-      setError(data.error ?? "Upload failed.");
+    try {
+      const { id } = await api<{ id: string }>("/api/import", { method: "POST", body: form });
+      router.push(`/docs/${id}`);
+    } catch (e) {
+      setError((e as Error).message);
       setBusy(null);
     }
     if (fileInput.current) fileInput.current.value = "";

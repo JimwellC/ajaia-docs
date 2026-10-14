@@ -1,0 +1,152 @@
+// All SQL lives here. Functions take plain values and return plain objects; no access checks.
+import { randomUUID } from "node:crypto";
+import { getPool } from "@/lib/db";
+import type { AccessGrant, ShareRole } from "@/lib/access";
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface DocSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+  ownerName: string;
+  role?: ShareRole;
+}
+
+export interface DocRecord {
+  id: string;
+  title: string;
+  content: string;
+  ownerId: string;
+  ownerName: string;
+  version: number;
+  updatedAt: string;
+}
+
+export interface Collaborator extends User {
+  role: ShareRole;
+}
+
+const q = () => getPool();
+
+export async function findUserById(id: string) {
+  const { rows } = await q().query<User>("SELECT id, email, name FROM users WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+
+export async function findUserByEmail(email: string) {
+  const { rows } = await q().query<User>("SELECT id, email, name FROM users WHERE lower(email) = lower($1)", [email]);
+  return rows[0] ?? null;
+}
+
+export async function listUsers() {
+  const { rows } = await q().query<User>("SELECT id, email, name FROM users ORDER BY name");
+  return rows;
+}
+
+export async function listOwned(userId: string) {
+  const { rows } = await q().query<DocSummary>(
+    `SELECT d.id, d.title, d.updated_at AS "updatedAt", u.name AS "ownerName"
+       FROM documents d JOIN users u ON u.id = d.owner_id
+      WHERE d.owner_id = $1 ORDER BY d.updated_at DESC`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function listSharedWith(userId: string) {
+  const { rows } = await q().query<DocSummary>(
+    `SELECT d.id, d.title, d.updated_at AS "updatedAt", u.name AS "ownerName", s.role
+       FROM shares s JOIN documents d ON d.id = s.document_id JOIN users u ON u.id = d.owner_id
+      WHERE s.user_id = $1 ORDER BY d.updated_at DESC`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function findDocument(id: string) {
+  const { rows } = await q().query<DocRecord>(
+    `SELECT d.id, d.title, d.content, d.owner_id AS "ownerId", u.name AS "ownerName",
+            d.version, d.updated_at AS "updatedAt"
+       FROM documents d JOIN users u ON u.id = d.owner_id WHERE d.id = $1`,
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
+export async function listCollaborators(documentId: string) {
+  const { rows } = await q().query<Collaborator>(
+    `SELECT u.id, u.name, u.email, s.role FROM shares s JOIN users u ON u.id = s.user_id
+      WHERE s.document_id = $1 ORDER BY u.name`,
+    [documentId],
+  );
+  return rows;
+}
+
+export async function listGrants(documentId: string): Promise<AccessGrant[]> {
+  const { rows } = await q().query<AccessGrant>(
+    `SELECT user_id AS "userId", role FROM shares WHERE document_id = $1`,
+    [documentId],
+  );
+  return rows;
+}
+
+export async function insertDocument(ownerId: string, title: string, content: string) {
+  const id = randomUUID();
+  await q().query("INSERT INTO documents (id, title, content, owner_id) VALUES ($1, $2, $3, $4)", [
+    id,
+    title,
+    content,
+    ownerId,
+  ]);
+  return id;
+}
+
+/**
+ * Updates only if the stored version still matches what the client last saw.
+ * Returns the new version and timestamp, or null when someone else saved first.
+ */
+export async function updateDocumentIfVersion(
+  id: string,
+  expectedVersion: number,
+  patch: { title?: string; content?: string },
+) {
+  const { rows } = await q().query<{ version: number; updatedAt: string }>(
+    `UPDATE documents
+        SET title = COALESCE($3, title), content = COALESCE($4, content),
+            version = version + 1, updated_at = now()
+      WHERE id = $1 AND version = $2
+      RETURNING version, updated_at AS "updatedAt"`,
+    [id, expectedVersion, patch.title ?? null, patch.content ?? null],
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteDocument(id: string) {
+  await q().query("DELETE FROM documents WHERE id = $1", [id]);
+}
+
+export async function insertShare(documentId: string, userId: string, role: ShareRole) {
+  await q().query("INSERT INTO shares (document_id, user_id, role) VALUES ($1, $2, $3)", [documentId, userId, role]);
+}
+
+export async function updateShareRole(documentId: string, userId: string, role: ShareRole) {
+  const { rowCount } = await q().query("UPDATE shares SET role = $3 WHERE document_id = $1 AND user_id = $2", [
+    documentId,
+    userId,
+    role,
+  ]);
+  return (rowCount ?? 0) > 0;
+}
+
+export async function deleteShare(documentId: string, userId: string) {
+  const { rowCount } = await q().query("DELETE FROM shares WHERE document_id = $1 AND user_id = $2", [
+    documentId,
+    userId,
+  ]);
+  return (rowCount ?? 0) > 0;
+}

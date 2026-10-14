@@ -1,11 +1,17 @@
 // Turns an uploaded file into a title and editor-ready HTML.
 import { marked } from "marked";
 import mammoth from "mammoth";
+import { AppError } from "@/server/errors";
 
 export const SUPPORTED_EXTENSIONS = [".txt", ".md", ".docx"] as const;
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024; // 2 MB
 
-export class ImportError extends Error {}
+/** Raised for files we refuse to import; the message is safe to show users. */
+export class ImportError extends AppError {
+  constructor(message: string, code: "validation" | "unsupported_file" | "too_large" = "validation") {
+    super(code, message);
+  }
+}
 
 export function getExtension(filename: string) {
   const dot = filename.lastIndexOf(".");
@@ -43,10 +49,10 @@ export async function fileToDocument(
 ): Promise<{ title: string; html: string }> {
   const ext = getExtension(filename);
   if (!SUPPORTED_EXTENSIONS.includes(ext as (typeof SUPPORTED_EXTENSIONS)[number])) {
-    throw new ImportError(`Unsupported file type. Please upload ${SUPPORTED_EXTENSIONS.join(", ")}.`);
+    throw new ImportError(`Unsupported file type. Please upload ${SUPPORTED_EXTENSIONS.join(", ")}.`, "unsupported_file");
   }
   if (bytes.byteLength === 0) throw new ImportError("The file is empty.");
-  if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new ImportError("File is larger than 2 MB.");
+  if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new ImportError("File is larger than 2 MB.", "too_large");
 
   let html: string;
   if (ext === ".docx") {

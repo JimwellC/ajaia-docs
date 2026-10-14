@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import type { DocSummary } from "@/lib/documents";
+import type { DocSummary } from "@/server/repo";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -38,7 +38,14 @@ export default function DocumentList({ owned, shared }: { owned: DocSummary[]; s
               <Link href={`/docs/${d.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-stone-50">
                 <span className="font-medium">{d.title}</span>
                 <span className="text-right text-sm text-stone-500">
-                  {tab === "shared" && <span className="mr-3">Owner: {d.ownerName}</span>}
+                  {tab === "shared" && (
+                    <>
+                      <span className="mr-2 rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600">
+                        {d.role === "viewer" ? "Can view" : "Can edit"}
+                      </span>
+                      <span className="mr-3">Owner: {d.ownerName}</span>
+                    </>
+                  )}
                   Edited {formatDate(d.updatedAt)}
                 </span>
               </Link>

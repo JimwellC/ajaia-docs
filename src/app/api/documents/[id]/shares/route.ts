@@ -1,31 +1,12 @@
 import { NextResponse } from "next/server";
-import { canView, checkShare } from "@/lib/access";
-import { addShare, findUserByEmail, getDocument } from "@/lib/documents";
-import { jsonError, requireUser } from "@/lib/http";
+import { requireUser } from "@/server/auth";
+import { shareDocument } from "@/server/documents";
+import { readJson, route } from "@/server/handler";
+import { parse, shareSchema } from "@/server/validation";
 
-const MESSAGES = {
-  not_owner: "Only the owner can share this document.",
-  self_share: "You already own this document.",
-  already_shared: "This person already has access.",
-} as const;
-
-export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { user, response } = await requireUser();
-  if (response) return response;
-  const id = (await params).id;
-  const doc = await getDocument(id);
-  if (!doc || !canView(doc, user.id)) return jsonError(404, "Document not found.");
-
-  const body = await req.json().catch(() => null);
-  const email = typeof body?.email === "string" ? body.email.trim() : "";
-  if (!email) return jsonError(400, "Enter an email address.");
-
-  const target = await findUserByEmail(email);
-  if (!target) return jsonError(404, "No user with that email. Try one of the demo accounts.");
-
-  const check = checkShare(doc, user.id, target.id);
-  if (!check.ok) return jsonError(check.reason === "not_owner" ? 403 : 409, MESSAGES[check.reason]);
-
-  await addShare(id, target.id);
-  return NextResponse.json({ ok: true, user: target }, { status: 201 });
-}
+export const POST = route<{ params: Promise<{ id: string }> }>(async (req, { params }) => {
+  const user = await requireUser(req);
+  const { email, role } = parse(shareSchema, await readJson(req));
+  const collaborator = await shareDocument((await params).id, user.id, email, role);
+  return NextResponse.json({ collaborator }, { status: 201 });
+});

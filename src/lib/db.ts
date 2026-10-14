@@ -1,17 +1,10 @@
 import { Pool } from "pg";
+import { poolConfig } from "./db-config";
 
 const globalForPool = globalThis as unknown as { pgPool?: Pool };
 
-function createPool() {
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
-  return new Pool({
-    connectionString: url,
-    ssl: url.includes("sslmode=require") ? { rejectUnauthorized: false } : undefined,
-    max: 5,
-  });
+// Created lazily so importing this module never needs a database (useful for builds and unit tests).
+export function getPool(): Pool {
+  if (!globalForPool.pgPool) globalForPool.pgPool = new Pool(poolConfig());
+  return globalForPool.pgPool;
 }
-
-// Reuse one pool across hot reloads in dev and across invocations on a warm serverless instance.
-export const pool = globalForPool.pgPool ?? createPool();
-if (process.env.NODE_ENV !== "production") globalForPool.pgPool = pool;

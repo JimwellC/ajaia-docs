@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
-import { listDocuments } from "@/lib/documents";
+import { listDocuments } from "@/server/documents";
 import Header from "@/components/Header";
 import DocumentList from "@/components/DocumentList";
 import CreateActions from "@/components/CreateActions";

@@ -1,23 +1,14 @@
 import { NextResponse } from "next/server";
-import { createDocument } from "@/lib/documents";
-import { jsonError, requireUser } from "@/lib/http";
-import { fileToDocument, ImportError } from "@/lib/importFile";
+import { requireUser } from "@/server/auth";
+import { importDocument } from "@/server/documents";
+import { AppError } from "@/server/errors";
+import { route } from "@/server/handler";
 
-export async function POST(req: Request) {
-  const { user, response } = await requireUser();
-  if (response) return response;
-
+export const POST = route(async (req) => {
+  const user = await requireUser(req);
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
-  if (!(file instanceof File)) return jsonError(400, "Choose a file to upload.");
-
-  try {
-    const { title, html } = await fileToDocument(file.name, Buffer.from(await file.arrayBuffer()));
-    const id = await createDocument(user.id, title, html);
-    return NextResponse.json({ id }, { status: 201 });
-  } catch (e) {
-    if (e instanceof ImportError) return jsonError(400, e.message);
-    console.error("Import failed", e);
-    return jsonError(500, "Something went wrong while importing the file.");
-  }
-}
+  if (!(file instanceof File)) throw new AppError("validation", "Choose a file to upload.");
+  const id = await importDocument(user.id, file.name, Buffer.from(await file.arrayBuffer()));
+  return NextResponse.json({ id }, { status: 201 });
+});
