@@ -12,6 +12,7 @@ import { DownloadLinks } from "./DocMenu";
 import { NavButton } from "./AppShell";
 import { useDocumentSaver, type Latest, type SaveState } from "./useDocumentSaver";
 import { useLiveUpdates } from "./useLiveUpdates";
+import CursorOverlay from "./CursorOverlay";
 import { useNow } from "./useNow";
 import { editorExtensions } from "@/lib/editorExtensions";
 import { relativeTime } from "@/lib/time";
@@ -73,6 +74,7 @@ export default function DocumentEditor({ doc, role }: Props) {
   const savedTitle = useRef(doc.title); // the title last committed or received; differs from `title` while typing one
   const [remoteAt, setRemoteAt] = useState<number | null>(null);
   const [others, setOthers] = useState<PresenceEntry[]>([]);
+  const contentBox = useRef<HTMLDivElement>(null);
   // A renamed document should update in the sidebar and lists.
   const saver = useDocumentSaver(doc.id, doc.version, { onSaved: (patch) => patch.title !== undefined && router.refresh() });
   // A 403 on save means an owner downgraded us to viewer while we were editing.
@@ -114,6 +116,7 @@ export default function DocumentEditor({ doc, role }: Props) {
     getVersion: saver.getVersion,
     isBusy: () => saver.isBusy() || title !== savedTitle.current,
     lastEditAt: () => lastEditAt.current,
+    cursorBlock: () => (editor && !editor.isDestroyed && editor.isFocused ? editor.state.selection.$head.index(0) : null),
     onRemote: applyRemote,
     onPresence: setOthers,
     onStop: saver.stop,
@@ -331,7 +334,10 @@ export default function DocumentEditor({ doc, role }: Props) {
             <Toolbar editor={editor} linkOpen={linkOpen} setLinkOpen={setLinkOpen} stickyTop={headerHeight} />
           )}
           <div className="pt-4">
-            <EditorContent editor={editor} />
+            <div ref={contentBox} className="relative">
+              <EditorContent editor={editor} />
+              <CursorOverlay editor={editor} others={others} container={contentBox} />
+            </div>
           </div>
         </div>
       </main>

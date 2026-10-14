@@ -34,6 +34,18 @@ export const updateShareSchema = z.strictObject({ role: z.enum(["viewer", "edito
 
 export const sessionSchema = z.strictObject({ userId: z.string().min(1) });
 
+/** Presence heartbeat: whether the user is typing, and the top-level block index holding their selection (null when not focused). */
+export const presenceSchema = z.strictObject({
+  typing: z.boolean({ error: "typing must be true or false." }),
+  cursorBlock: z
+    .number({ error: "cursorBlock must be a number or null." })
+    .int("cursorBlock must be a whole number.")
+    .min(0, "cursorBlock cannot be negative.")
+    .max(100_000, "cursorBlock is too large.")
+    .nullable()
+    .default(null),
+});
+
 /** Parses input or throws a 400 with the first readable message. */
 export function parse<T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> {
   const result = schema.safeParse(input);

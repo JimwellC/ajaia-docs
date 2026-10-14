@@ -92,6 +92,8 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 
 **Presence via heartbeat polling, not websockets.** Each open editor's 4 second poll first posts a heartbeat (`POST /api/documents/[id]/presence`, view access required, 404 otherwise) that upserts `document_presence`; the document GET then lists other members seen in the last 12 seconds, marked typing if they typed in the last 5, never including the requester.
 
+**Block-level cursor indicators via heartbeat polling.** The heartbeat also sends the index of the top-level block holding the user's selection (null when the editor isn't focused), and an overlay beside the editor marks that block for each other user; it only reads the editor's DOM, so it never changes the document or triggers a save. Character-level cursors would need Yjs.
+
 **Testable route handlers.** Auth reads the session from the `Request` rather than Next's request-scoped `cookies()`, so integration tests call the real handlers with real `Request` objects against Postgres.
 
 ## UX and accessibility
@@ -113,7 +115,7 @@ users              (id, email unique, name)
 documents          (id, title, content html, owner_id → users, version, created_at, updated_at)
 shares             (document_id → documents, user_id → users, role viewer|editor), primary key on the pair
 sessions           (token, user_id → users, created_at, expires_at)
-document_presence  (document_id → documents, user_id → users, last_seen, typing_at), primary key on the pair
+document_presence  (document_id → documents, user_id → users, last_seen, typing_at, cursor_block), primary key on the pair
 schema_migrations  (name, applied_at)
 ```
 

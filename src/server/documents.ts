@@ -33,9 +33,9 @@ export async function getDocument(docId: string, userId: string) {
 }
 
 /** Heartbeat from an open editor. Anyone who can view the document may report presence. */
-export async function reportPresence(docId: string, userId: string, typing: boolean) {
+export async function reportPresence(docId: string, userId: string, typing: boolean, cursorBlock: number | null = null) {
   await loadForUser(docId, userId);
-  await repo.touchPresence(docId, userId, typing);
+  await repo.touchPresence(docId, userId, typing, cursorBlock);
 }
 
 export async function createDocument(userId: string, title?: string, content = "") {

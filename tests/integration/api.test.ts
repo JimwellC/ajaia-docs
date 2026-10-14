@@ -241,14 +241,31 @@ describe.skipIf(!hasDb)("presence", () => {
     expect((await call(presence.POST, { method: "POST", as: JIMWELL, params: { id }, json: { typing: false } })).status).toBe(204);
 
     const owner = await call(document.GET, { as: JIMWELL, params: { id } });
-    expect(owner.body.presence).toEqual([{ id: JIM, name: "Jim", role: "editor", isTyping: true }]);
+    expect(owner.body.presence).toEqual([{ id: JIM, name: "Jim", role: "editor", isTyping: true, cursorBlock: null }]);
     const jim = await call(document.GET, { as: JIM, params: { id } });
-    expect(jim.body.presence).toEqual([{ id: JIMWELL, name: "Jimwell Calma", role: "owner", isTyping: false }]);
+    expect(jim.body.presence).toEqual([{ id: JIMWELL, name: "Jimwell Calma", role: "owner", isTyping: false, cursorBlock: null }]);
 
     // Typing expires after 5 seconds, presence after 12.
     await getPool().query("UPDATE document_presence SET typing_at = now() - interval '6 seconds' WHERE user_id = $1", [JIM]);
     expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.presence[0].isTyping).toBe(false);
     await getPool().query("UPDATE document_presence SET last_seen = now() - interval '13 seconds' WHERE user_id = $1", [JIM]);
     expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.presence).toEqual([]);
+  });
+});
+
+describe.skipIf(!hasDb)("presence cursor", () => {
+  beforeEach(resetDb);
+
+  it("round-trips cursorBlock and rejects invalid values", async () => {
+    const id = await createDoc(JIMWELL, "Cursor");
+    expect((await call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json: { email: "jim@ajaia.test", role: "editor" } })).status).toBe(201);
+
+    expect((await call(presence.POST, { method: "POST", as: JIM, params: { id }, json: { typing: false, cursorBlock: 2 } })).status).toBe(204);
+    expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.presence[0].cursorBlock).toBe(2);
+
+    expect((await call(presence.POST, { method: "POST", as: JIM, params: { id }, json: { typing: false, cursorBlock: null } })).status).toBe(204);
+    expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.presence[0].cursorBlock).toBeNull();
+
+    expect((await call(presence.POST, { method: "POST", as: JIM, params: { id }, json: { typing: false, cursorBlock: -1 } })).status).toBe(400);
   });
 });

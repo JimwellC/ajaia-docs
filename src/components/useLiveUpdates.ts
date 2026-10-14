@@ -15,6 +15,7 @@ interface Options {
   getVersion: () => number;
   isBusy: () => boolean; // unsaved local work, including an uncommitted title
   lastEditAt: () => number | null;
+  cursorBlock: () => number | null;
   onRemote: (latest: Latest) => void;
   onPresence: (others: PresenceEntry[]) => void;
   onStop: (reason: "gone" | "readonly") => void;
@@ -38,7 +39,7 @@ export function useLiveUpdates(options: Options) {
         const edited = opts.current.lastEditAt();
         await api(`/api/documents/${docId}/presence`, {
           method: "POST",
-          json: { typing: edited !== null && Date.now() - edited < TYPING_REPORT_MS },
+          json: { typing: edited !== null && Date.now() - edited < TYPING_REPORT_MS, cursorBlock: opts.current.cursorBlock() },
         });
         const latest = await api<Latest & { presence?: PresenceEntry[] }>(`/api/documents/${docId}`, { cache: "no-store" });
         if (cancelled) return;

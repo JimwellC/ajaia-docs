@@ -188,15 +188,17 @@ export interface PresenceEntry {
   name: string;
   role: "owner" | ShareRole;
   isTyping: boolean;
+  cursorBlock: number | null;
 }
 
-export async function touchPresence(documentId: string, userId: string, typing: boolean) {
+export async function touchPresence(documentId: string, userId: string, typing: boolean, cursorBlock: number | null) {
   await q().query(
-    `INSERT INTO document_presence (document_id, user_id, last_seen, typing_at)
-     VALUES ($1, $2, now(), CASE WHEN $3 THEN now() END)
+    `INSERT INTO document_presence (document_id, user_id, last_seen, typing_at, cursor_block)
+     VALUES ($1, $2, now(), CASE WHEN $3 THEN now() END, $4)
      ON CONFLICT (document_id, user_id) DO UPDATE
-       SET last_seen = now(), typing_at = CASE WHEN $3 THEN now() ELSE document_presence.typing_at END`,
-    [documentId, userId, typing],
+       SET last_seen = now(), typing_at = CASE WHEN $3 THEN now() ELSE document_presence.typing_at END,
+           cursor_block = $4`,
+    [documentId, userId, typing, cursorBlock],
   );
 }
 
@@ -205,7 +207,8 @@ export async function listPresence(documentId: string, exceptUserId: string) {
   const { rows } = await q().query<PresenceEntry>(
     `SELECT u.id, u.name,
             CASE WHEN d.owner_id = u.id THEN 'owner' ELSE s.role END AS role,
-            COALESCE(p.typing_at > now() - interval '5 seconds', false) AS "isTyping"
+            COALESCE(p.typing_at > now() - interval '5 seconds', false) AS "isTyping",
+            p.cursor_block AS "cursorBlock"
        FROM document_presence p
        JOIN users u ON u.id = p.user_id
        JOIN documents d ON d.id = p.document_id
