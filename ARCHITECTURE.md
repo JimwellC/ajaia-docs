@@ -123,7 +123,7 @@ Deleting a document cascades to its shares. Deleting a user cascades to their se
 
 ## Known limitations
 
-- Other people's changes appear only after they are saved, within about 5 seconds. There is no live keystroke co-editing, no cursors and no presence
+- Other people's changes appear only after they are saved, within about 5 seconds. There is no live keystroke co-editing, and cursors are shown per block (paragraph or heading), not per character
 - An editor downgraded to viewer finds out on their next save (403), not from polling, since viewers may still read the document
 - Polling costs one small request per open document every 4 seconds while the tab is visible
 - The formatting toolbar has no arrow-key navigation between buttons; each button is reached with Tab
