@@ -2,7 +2,7 @@
 
 A lightweight collaborative document editor: create, format, rename, import, and share documents, with everything persisted in Postgres.
 
-**Live app:** LIVE_URL_HERE
+**Live app:** https://ajaia-docs-red-nu.vercel.app
 
 ## Demo accounts
 

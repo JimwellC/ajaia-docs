@@ -1,7 +1,7 @@
 # Submission
 
 **Candidate:** Jimwell Calma (jimwellwork28@gmail.com)
-**Live app:** LIVE_URL_HERE
+**Live app:** https://ajaia-docs-red-nu.vercel.app
 **Walkthrough video:** see `VIDEO_URL.txt`
 
 ## Included
