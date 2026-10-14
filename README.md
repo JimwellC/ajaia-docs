@@ -19,7 +19,7 @@ Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on
 1. As **Jimwell Calma**, create a document, format it, and share it with `jim@ajaia.test` (Can edit).
 2. **Switch user** to **Jim**: it appears in the sidebar under **Shared** and Jim can edit it.
 3. Switch to **JC** and open the welcome document: it is read-only. Open Jimwell's new document URL: "Document not found".
-4. **Edit conflict:** open the same document as Jimwell and Jim in two browsers (one normal, one private window). Save an edit as Jim, then type as Jimwell: Jimwell gets a warning and chooses which version to keep.
+4. **Live updates and conflicts:** open the same document as Jimwell and Jim in two browsers (one normal, one private window). Type as Jim and wait for "Saved": the text appears in Jimwell's window within about 5 seconds. Then type in both windows at the same time: whoever saves second gets a warning and chooses which version to keep.
 
 ## Features
 

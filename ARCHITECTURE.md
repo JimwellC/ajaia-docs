@@ -9,11 +9,11 @@ I didn't try to build Google Docs in a few hours. I picked the parts that matter
 - **Errors are handled consistently**: every request is validated, every failure has a clear code and message, and internals never leak
 - **The reasoning is explicit**: this note covers each decision and each cut
 
-The one stretch item I chose is view vs edit roles, because it deepens permission enforcement rather than widening the product.
+The stretch items I chose are view vs edit roles, Markdown and plain text download, and polling-based live updates, each chosen because it deepens the core rather than widening it.
 
 ## Cut on purpose
 
-- **Real-time co-editing.** I've built real-time systems before (live bidding over Socket.IO and Redis), so I know what doing it properly costs: CRDTs such as Yjs, a websocket server, presence, and reconnection handling. That isn't a responsible fit for this timebox. Instead I made concurrent editing *safe*: conflicting saves are detected and the user decides. Nobody loses work, at a fraction of the complexity. On top of that, an open document polls the server every 4 seconds while the tab is visible, so other people's *saved* changes appear within about 5 seconds. No websockets and no new dependencies.
+- **Live keystroke co-editing.** I've built real-time systems before (live bidding over Socket.IO and Redis), so I know what doing it properly costs: CRDTs such as Yjs, a websocket server, presence, and reconnection handling. That isn't a responsible fit for this timebox. Instead I made concurrent editing *safe*: conflicting saves are detected and the user decides. Nobody loses work, at a fraction of the complexity. On top of that, an open document polls the server every 4 seconds while the tab is visible, so other people's *saved* changes appear within about 5 seconds. No websockets and no new dependencies.
 - **Real authentication.** The brief allows mocked users, so sign-in is a demo picker. It still issues a real server-side session, and every permission check runs against that session, so real auth would only change how a session gets issued.
 - **Comments and version history.** Useful, but each widens the product without strengthening the core. The `version` column is a natural base for history later.
 
@@ -86,15 +86,15 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 
 **Deployment health check.** `GET /api/health` returns 200 only when the database answers and every file in `db/migrations` is recorded in `schema_migrations`; otherwise 503 with the pending names. It needs no sign-in and never echoes connection details. The README's deployment checklist runs migrations before deploying and confirms this endpoint after.
 
-**Postgres with plain SQL and versioned migrations.** I started with Prisma, but its engine binaries couldn't be downloaded in my build environment. Three tables don't need an ORM, so SQL lives in one repository file and schema changes are numbered migration files applied once each and tracked in `schema_migrations`. The second migration (versions and roles) upgraded the already-deployed database without data loss: existing shares became editors.
+**Postgres with plain SQL and versioned migrations.** I started with Prisma, but its engine binaries couldn't be downloaded in my build environment. A handful of tables don't need an ORM, so SQL lives in one repository file and schema changes are numbered migration files applied once each and tracked in `schema_migrations`. The second migration (versions and roles) upgraded the already-deployed database without data loss: existing shares became editors.
+
+**Downloads.** `GET /api/documents/[id]/export?format=md|txt` uses the same access check as reading: anyone who can view the document can download it, everyone else gets 404. The stored HTML is already limited to the allowlist, so the converter (`src/server/export.ts`) only has to handle those formats. Markdown keeps every format except underline, which Markdown can't express, and escapes text that would otherwise turn into Markdown syntax. The filename comes from the title, with an ASCII fallback and the full UTF-8 name in `Content-Disposition`.
 
 **Testable route handlers.** Auth reads the session from the `Request` rather than Next's request-scoped `cookies()`, so integration tests call the real handlers with real `Request` objects against Postgres.
 
 ## UX and accessibility
 
 The interface is writing first: warm neutral colors, the system font, a sidebar instead of page chrome, and a centered 720px editing column with no card around it. The top bar keeps the save status visible ("Saving…", "Saved", "Edited 2 minutes ago", or a failure message). Times that depend on the viewer's clock (the greeting and relative times) render only after the page loads in the browser, so server and browser output never disagree.
-
-**Downloads.** `GET /api/documents/[id]/export?format=md|txt` uses the same access check as reading: anyone who can view the document can download it, everyone else gets 404. The stored HTML is already limited to the allowlist, so the converter (`src/server/export.ts`) only has to handle those formats. Markdown keeps every format except underline, which Markdown can't express, and escapes text that would otherwise turn into Markdown syntax. The filename comes from the title, with an ASCII fallback and the full UTF-8 name in `Content-Disposition`.
 
 Checked against a local production build with Playwright:
 
@@ -121,12 +121,14 @@ Deleting a document cascades to its shares. Deleting a user cascades to their se
 - Other people's changes appear only after they are saved, within about 5 seconds. There is no live keystroke co-editing, no cursors and no presence
 - An editor downgraded to viewer finds out on their next save (403), not from polling, since viewers may still read the document
 - Polling costs one small request per open document every 4 seconds while the tab is visible
+- The formatting toolbar has no arrow-key navigation between buttons; each button is reached with Tab
+- Markdown tables flatten into a paragraph on import (the cell text is kept, the table structure is not)
 - Demo sign-in: anyone can pick any demo user (but they get a real session, and cookies can't be forged)
 - No rate limiting or audit log
 
 ## What I'd build next (2 to 4 more hours)
 
-1. Real-time collaboration with Yjs and presence indicators
+1. Live keystroke co-editing with Yjs and presence (saved changes already appear within about 5 seconds by polling)
 2. Version history from saved snapshots (the version column is already there)
 3. Comments anchored to text ranges
 4. Real authentication (magic link or OAuth)

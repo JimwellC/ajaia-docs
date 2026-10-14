@@ -2,15 +2,15 @@
 
 ## Tools used
 
-- **Claude** as a pair programmer for planning, writing code, and testing
-- **Claude Code** in the terminal for repository setup, deployment to Vercel, and filling in the live URL
+- **Claude (chat)** for planning, scoping, and writing the first versions of the code and tests
+- **Claude Code** in the terminal for deployment to Vercel, verification (tests, browser checks, production smoke tests), and the later rounds of changes I specified: renaming the demo users, the UI redesign with document download, live updates by polling, and final docs
 
 ## How I used it
 
 I set the scope and priorities, then had Claude generate code one layer at a time and reviewed each layer before moving on. I worked in two passes:
 
 1. **A working first version:** editor, import, sharing, persistence, deployment
-2. **An engineering pass:** after deploying, I judged the first version too thin on structure for what this assessment evaluates, so I directed a refactor into a service layer with typed errors and validation, then added edit conflict detection, viewer and editor roles, migrations, integration tests, and CI. I also cut a Markdown export feature I had added, to keep the release small and focused
+2. **An engineering pass:** after deploying, I judged the first version too thin on structure for what this assessment evaluates, so I directed a refactor into a service layer with typed errors and validation, then added edit conflict detection, viewer and editor roles, migrations, integration tests, and CI
 
 ## Where AI sped things up most
 
@@ -21,13 +21,13 @@ I set the scope and priorities, then had Claude generate code one layer at a tim
 
 ## What I changed or rejected
 
-- **Prisma → plain `pg`.** The first draft used Prisma, but its engine download was blocked in the build environment. Three tables don't need an ORM, so I dropped it.
+- **Prisma → plain `pg`.** The first draft used Prisma, but its engine download was blocked in the build environment. A handful of tables don't need an ORM, so I dropped it.
 - **Single schema file → versioned migrations.** Adding roles and versions to an already-deployed database needed a real upgrade path, not a rewrite of the schema file.
 - **Silent last-write-wins → conflict detection.** The first autosave just saved whatever arrived last. I replaced it with versioned saves so concurrent edits are detected and the user decides.
 - **Raw HTML in markdown.** A straightforward conversion would pass raw HTML through. It's escaped first, with a test to keep it that way.
 - **403 vs 404.** Returning 403 for documents a user can't see would confirm they exist, so those return 404.
 - **Untestable route handlers.** The first version read cookies through Next's request-scoped API, which made route handlers hard to test. Auth now reads from the `Request`, so tests call the real handlers.
-- **Scope cuts.** I removed a working Markdown export feature. It was tested and fine, but a smaller release with stronger guarantees is a better product decision for this brief than one more feature.
+- I first cut a Markdown export to keep the release small, then reintroduced it as Markdown and plain text download alongside the UI redesign.
 - **User id cookie → server-side sessions.** The cookie held a raw user id, so anyone could impersonate anyone by editing it; it now holds a random token looked up in a `sessions` table, and sign-out revokes it.
 - **Trusting client HTML → server-side sanitization.** Saved and imported HTML now passes through an allowlist that matches the editor, so scripts, event handlers, iframes, and styles never reach the database.
 - **Generic save errors → specific recovery.** A 404 stops saving and links back, a 403 switches to read-only, a network failure retries every 5 seconds, and "Saved" appears only after the server confirms.
