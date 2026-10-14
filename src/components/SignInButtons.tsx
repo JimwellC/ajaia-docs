@@ -1,0 +1,47 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import type { User } from "@/lib/session";
+
+export default function SignInButtons({ users }: { users: User[] }) {
+  const router = useRouter();
+  const [pending, setPending] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  async function signIn(userId: string) {
+    setPending(userId);
+    setError("");
+    const res = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (res.ok) {
+      router.push("/");
+      router.refresh();
+    } else {
+      setError("Could not sign in. Please try again.");
+      setPending(null);
+    }
+  }
+
+  return (
+    <div className="mt-8 space-y-3">
+      {users.map((u) => (
+        <button
+          key={u.id}
+          onClick={() => signIn(u.id)}
+          disabled={pending !== null}
+          className="flex w-full items-center justify-between rounded-xl border border-stone-300 bg-white px-4 py-3 text-left transition hover:border-stone-500 disabled:opacity-60"
+        >
+          <span>
+            <span className="block font-medium">{u.name}</span>
+            <span className="block text-sm text-stone-500">{u.email}</span>
+          </span>
+          <span className="text-sm text-stone-500">{pending === u.id ? "Signing in…" : "Continue →"}</span>
+        </button>
+      ))}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
