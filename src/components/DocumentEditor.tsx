@@ -59,7 +59,7 @@ function typingLabel(others: PresenceEntry[]) {
 const REMOTE_LABEL_MS = 4000; // how long "Updated by another user" stays up
 const SAVED_LABEL_MS = 60_000; // show "Saved" for a minute after a confirmed save, then "Edited … ago"
 
-const topButton = "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-ink hover:bg-hover";
+const topButton = "inline-flex h-8 max-md:h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-ink hover:bg-hover";
 
 export default function DocumentEditor({ doc, role }: Props) {
   const router = useRouter();
@@ -182,7 +182,7 @@ export default function DocumentEditor({ doc, role }: Props) {
         <nav aria-label="Breadcrumb" className="min-w-0 flex-1 px-1">
           <ol className="flex min-w-0 items-center gap-1.5 text-sm">
             <li className="shrink-0">
-              <Link href={`/?view=${section.toLowerCase()}`} className="rounded px-1 text-ink-muted hover:bg-hover">
+              <Link href={`/?view=${section.toLowerCase()}`} className="rounded px-1 text-ink-muted hover:bg-hover max-md:inline-flex max-md:h-10 max-md:items-center">
                 {section}
               </Link>
             </li>
@@ -234,8 +234,8 @@ export default function DocumentEditor({ doc, role }: Props) {
           buttonContent={
             <>
               <Download size={15} aria-hidden="true" />
-              <span className="hidden sm:inline">Download</span>
-              <span className="sr-only sm:hidden">Download</span>
+              <span className="hidden lg:inline">Download</span>
+              <span className="sr-only lg:hidden">Download</span>
               <ChevronDown size={14} aria-hidden="true" className="text-ink-muted" />
             </>
           }
@@ -272,7 +272,7 @@ export default function DocumentEditor({ doc, role }: Props) {
         </Popover>
       </header>
 
-      <main className="mx-auto w-full max-w-[720px] px-5 sm:px-8 md:px-0">
+      <main className="mx-auto w-full max-w-[720px] px-5 sm:px-8 lg:px-0">
         {saver.state === "gone" && (
           <div role="alert" className="mt-6 rounded-md bg-red-50 p-3 text-sm text-red-900">
             This document was deleted or you no longer have access.{" "}
@@ -316,7 +316,7 @@ export default function DocumentEditor({ doc, role }: Props) {
           maxLength={120}
           placeholder="Untitled"
           aria-label="Document title"
-          className="mt-10 w-full rounded-md bg-transparent text-[2.25rem] font-bold leading-tight tracking-tight outline-none placeholder:text-[#a5a29c] read-only:cursor-default focus-visible:ring-2 focus-visible:ring-ink-muted/60 sm:mt-14 sm:text-[2.5rem]"
+          className="mt-10 w-full rounded-md bg-transparent text-[1.75rem] max-md:py-1 font-bold leading-tight tracking-tight outline-none placeholder:text-[#a5a29c] read-only:cursor-default focus-visible:ring-2 focus-visible:ring-ink-muted/60 sm:mt-14 sm:text-[2.5rem]"
         />
         {titleError && (
           <p className="mt-1 text-sm text-red-700" role="alert">

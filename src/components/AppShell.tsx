@@ -82,7 +82,7 @@ export default function AppShell({ user, owned, shared, currentDocId, children }
 /** Opens the drawer on narrow screens, or brings back a collapsed sidebar on wide ones. */
 export function NavButton() {
   const { openDrawer, collapsed, expand } = useContext(ShellContext);
-  const base = "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-hover";
+  const base = "inline-flex h-8 w-8 max-md:h-10 max-md:w-10 shrink-0 items-center justify-center rounded-md text-ink-muted hover:bg-hover";
   return (
     <>
       <button type="button" onClick={openDrawer} aria-label="Open navigation" className={`${base} md:hidden`}>
@@ -126,7 +126,7 @@ function Sidebar({
 }: Omit<ShellProps, "children"> & { isHome: boolean; onCollapse?: () => void; onClose?: () => void }) {
   const router = useRouter();
   const create = useCreateDocument();
-  const action = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-ink-muted hover:bg-hover disabled:opacity-60";
+  const action = "flex w-full items-center gap-2 rounded-md px-2 py-1.5 max-md:py-2.5 text-left text-ink-muted hover:bg-hover disabled:opacity-60";
 
   async function signOut() {
     await fetch("/api/session", { method: "DELETE" });
@@ -137,7 +137,7 @@ function Sidebar({
   return (
     <aside className="flex h-full flex-col bg-sidebar text-sm text-ink">
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 font-semibold hover:bg-hover">
+        <Link href="/" className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 max-md:py-2.5 font-semibold hover:bg-hover">
           <AppIcon />
           <span className="truncate">Ajaia Docs</span>
         </Link>
@@ -147,7 +147,7 @@ function Sidebar({
           </button>
         )}
         {onClose && (
-          <button type="button" onClick={onClose} aria-label="Close navigation" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-muted hover:bg-hover">
+          <button type="button" onClick={onClose} aria-label="Close navigation" className="inline-flex h-7 w-7 max-md:h-10 max-md:w-10 items-center justify-center rounded-md text-ink-muted hover:bg-hover">
             <X size={16} aria-hidden="true" />
           </button>
         )}
@@ -172,7 +172,7 @@ function Sidebar({
         <Link
           href="/"
           aria-current={isHome ? "page" : undefined}
-          className={`flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover ${isHome ? "bg-selected font-medium" : "text-ink-muted"}`}
+          className={`flex items-center gap-2 rounded-md px-2 py-1.5 max-md:py-2.5 hover:bg-hover ${isHome ? "bg-selected font-medium" : "text-ink-muted"}`}
         >
           <House size={16} aria-hidden="true" /> Home
         </Link>
@@ -192,7 +192,7 @@ function Sidebar({
         <span className="min-w-0 flex-1 truncate font-medium" title={user.name}>
           {user.name}
         </span>
-        <button type="button" onClick={signOut} className="shrink-0 rounded-md px-2 py-1 text-ink-muted hover:bg-hover">
+        <button type="button" onClick={signOut} className="shrink-0 rounded-md px-2 py-1 max-md:py-2.5 text-ink-muted hover:bg-hover">
           Switch user
         </button>
       </div>
@@ -215,7 +215,7 @@ function DocItem({ doc, current, canDelete = false, roleHint }: { doc: DocSummar
       <Link
         href={`/docs/${doc.id}`}
         aria-current={current ? "page" : undefined}
-        className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 focus-visible:outline-offset-[-2px] ${current ? "font-medium" : ""}`}
+        className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 max-md:py-2.5 focus-visible:outline-offset-[-2px] ${current ? "font-medium" : ""}`}
       >
         {doc.title}
         {roleHint && <span className="sr-only"> ({roleHint.toLowerCase()})</span>}

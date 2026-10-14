@@ -67,14 +67,14 @@ export default function SharePanel({ docId, initial }: { docId: string; initial:
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="jim@ajaia.test"
-          className="w-full rounded-md border border-line px-2 py-1.5"
+          className="w-full rounded-md border border-line px-2 py-1.5 max-md:py-2.5"
         />
         <div className="flex gap-2">
           <select
             aria-label="Access level"
             value={role}
             onChange={(e) => setRole(e.target.value as ShareRole)}
-            className="flex-1 rounded-md border border-line px-2 py-1.5"
+            className="flex-1 rounded-md border border-line px-2 py-1.5 max-md:py-2.5"
           >
             <option value="editor">Can edit</option>
             <option value="viewer">Can view</option>
@@ -103,7 +103,7 @@ export default function SharePanel({ docId, initial }: { docId: string; initial:
                   aria-label={`Access for ${p.name}`}
                   value={p.role}
                   onChange={(e) => changeRole(p.id, e.target.value as ShareRole)}
-                  className="rounded border border-line px-1 py-0.5 text-xs"
+                  className="rounded border border-line px-1 py-0.5 max-md:min-h-10 text-xs"
                 >
                   <option value="editor">Can edit</option>
                   <option value="viewer">Can view</option>
@@ -111,7 +111,7 @@ export default function SharePanel({ docId, initial }: { docId: string; initial:
                 <button
                   onClick={() => remove(p.id)}
                   aria-label={`Remove ${p.name}`}
-                  className="px-1 text-xs text-ink-muted hover:text-red-700"
+                  className="px-1 max-md:min-h-10 text-xs text-ink-muted hover:text-red-700"
                 >
                   Remove
                 </button>

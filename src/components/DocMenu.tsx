@@ -38,7 +38,7 @@ export default function DocMenu({
     <Popover
       label={`Actions for ${doc.title}`}
       buttonContent={<MoreHorizontal size={16} aria-hidden="true" />}
-      buttonClassName={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-selected aria-expanded:opacity-100 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 ${className}`}
+      buttonClassName={`inline-flex h-6 w-6 max-md:h-10 max-md:w-10 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-selected aria-expanded:opacity-100 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 ${className}`}
       panelLabel={`Actions for ${doc.title}`}
       width={232}
     >

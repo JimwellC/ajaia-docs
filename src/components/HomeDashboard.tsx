@@ -122,7 +122,7 @@ export default function HomeDashboard({
                   tabIndex={view === v.id ? 0 : -1}
                   onClick={() => selectView(v.id)}
                   onKeyDown={(e) => onTabKey(e, i)}
-                  className={`rounded-md px-2.5 py-1 text-sm ${view === v.id ? "bg-selected font-medium text-ink" : "text-ink-muted hover:bg-hover"}`}
+                  className={`rounded-md px-2.5 py-1 max-md:min-w-10 max-md:py-2.5 text-sm ${view === v.id ? "bg-selected font-medium text-ink" : "text-ink-muted hover:bg-hover"}`}
                 >
                   {v.label}
                 </button>
@@ -138,7 +138,7 @@ export default function HomeDashboard({
                 onKeyDown={(e) => e.key === "Escape" && setQuery("")}
                 placeholder="Search by title"
                 aria-label="Search documents by title"
-                className="w-full rounded-md bg-sidebar py-1.5 pl-8 pr-8 text-sm placeholder:text-ink-muted [&::-webkit-search-cancel-button]:hidden"
+                className="w-full rounded-md bg-sidebar py-1.5 max-md:py-2.5 pl-8 pr-8 text-sm placeholder:text-ink-muted [&::-webkit-search-cancel-button]:hidden"
               />
               {query && (
                 <button
@@ -148,7 +148,7 @@ export default function HomeDashboard({
                     searchRef.current?.focus();
                   }}
                   aria-label="Clear search"
-                  className="absolute right-1.5 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-ink-muted hover:bg-hover"
+                  className="absolute right-1.5 top-1/2 inline-flex h-6 w-6 max-md:right-0 max-md:h-10 max-md:w-10 -translate-y-1/2 items-center justify-center rounded text-ink-muted hover:bg-hover"
                 >
                   <X size={14} aria-hidden="true" />
                 </button>

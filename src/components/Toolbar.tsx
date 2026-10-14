@@ -60,7 +60,7 @@ function Btn({
       aria-keyshortcuts={shortcut?.replace("Mod", mac ? "Meta" : "Control")}
       title={shortcut ? `${label} (${formatShortcut(shortcut, mac)})` : label}
       disabled={disabled}
-      className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md px-2 text-sm transition disabled:opacity-40 ${
+      className={`inline-flex h-8 min-w-8 max-md:h-10 max-md:min-w-10 shrink-0 items-center justify-center rounded-md px-2 text-sm transition disabled:opacity-40 ${
         active ? "bg-selected text-ink" : "text-ink-muted hover:bg-hover hover:text-ink"
       }`}
     >
@@ -184,7 +184,7 @@ export default function Toolbar({
       {showHint && (
         <div className="mt-2 flex items-start justify-between gap-3 rounded-md bg-sidebar px-3 py-2 text-sm text-ink-muted">
           <p>Tip: type # for a heading, - for a list, &gt; for a quote, ``` for code.</p>
-          <button type="button" onClick={dismissHint} aria-label="Dismiss tip" className="shrink-0 rounded p-0.5 text-ink-muted hover:bg-hover">
+          <button type="button" onClick={dismissHint} aria-label="Dismiss tip" className="shrink-0 rounded p-0.5 max-md:-my-2 max-md:p-3 text-ink-muted hover:bg-hover">
             <X size={16} aria-hidden="true" />
           </button>
         </div>
@@ -258,7 +258,7 @@ function LinkPopover({ editor, onClose }: { editor: Editor; onClose: () => void 
         placeholder="https://example.com"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "link-url-error" : undefined}
-        className="mt-1 w-full rounded-md border border-line bg-white px-2 py-1.5 text-sm"
+        className="mt-1 w-full rounded-md border border-line bg-white px-2 py-1.5 max-md:py-2.5 text-sm"
       />
       {error && (
         <p id="link-url-error" role="alert" className="mt-1 text-xs text-red-700">
@@ -266,13 +266,13 @@ function LinkPopover({ editor, onClose }: { editor: Editor; onClose: () => void 
         </p>
       )}
       <div className="mt-2 flex flex-wrap gap-2 text-sm">
-        <button type="submit" className="rounded-md bg-ink px-3 py-1 text-white hover:bg-black">
+        <button type="submit" className="rounded-md bg-ink px-3 py-1 max-md:py-2.5 text-white hover:bg-black">
           Apply
         </button>
-        <button type="button" onClick={remove} disabled={!inLink} className="rounded-md px-3 py-1 ring-1 ring-line hover:bg-hover disabled:opacity-50">
+        <button type="button" onClick={remove} disabled={!inLink} className="rounded-md px-3 py-1 max-md:py-2.5 ring-1 ring-line hover:bg-hover disabled:opacity-50">
           Remove link
         </button>
-        <button type="button" onClick={close} className="px-2 py-1 text-ink-muted underline">
+        <button type="button" onClick={close} className="px-2 py-1 max-md:py-2.5 text-ink-muted underline">
           Cancel
         </button>
       </div>
