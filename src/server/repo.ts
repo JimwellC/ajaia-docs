@@ -182,3 +182,39 @@ export async function deleteShare(documentId: string, userId: string) {
   ]);
   return (rowCount ?? 0) > 0;
 }
+
+export interface PresenceEntry {
+  id: string;
+  name: string;
+  role: "owner" | ShareRole;
+  isTyping: boolean;
+}
+
+export async function touchPresence(documentId: string, userId: string, typing: boolean) {
+  await q().query(
+    `INSERT INTO document_presence (document_id, user_id, last_seen, typing_at)
+     VALUES ($1, $2, now(), CASE WHEN $3 THEN now() END)
+     ON CONFLICT (document_id, user_id) DO UPDATE
+       SET last_seen = now(), typing_at = CASE WHEN $3 THEN now() ELSE document_presence.typing_at END`,
+    [documentId, userId, typing],
+  );
+}
+
+/** Other members seen in the last 12 seconds; typing if they typed in the last 5. Never includes `exceptUserId`. */
+export async function listPresence(documentId: string, exceptUserId: string) {
+  const { rows } = await q().query<PresenceEntry>(
+    `SELECT u.id, u.name,
+            CASE WHEN d.owner_id = u.id THEN 'owner' ELSE s.role END AS role,
+            COALESCE(p.typing_at > now() - interval '5 seconds', false) AS "isTyping"
+       FROM document_presence p
+       JOIN users u ON u.id = p.user_id
+       JOIN documents d ON d.id = p.document_id
+       LEFT JOIN shares s ON s.document_id = p.document_id AND s.user_id = p.user_id
+      WHERE p.document_id = $1 AND p.user_id <> $2
+        AND p.last_seen > now() - interval '12 seconds'
+        AND (d.owner_id = u.id OR s.user_id IS NOT NULL)
+      ORDER BY u.name`,
+    [documentId, exceptUserId],
+  );
+  return rows;
+}

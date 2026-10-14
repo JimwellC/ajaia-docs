@@ -90,6 +90,8 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 
 **Downloads.** `GET /api/documents/[id]/export?format=md|txt` uses the same access check as reading: anyone who can view the document can download it, everyone else gets 404. The stored HTML is already limited to the allowlist, so the converter (`src/server/export.ts`) only has to handle those formats. Markdown keeps every format except underline, which Markdown can't express, and escapes text that would otherwise turn into Markdown syntax. The filename comes from the title, with an ASCII fallback and the full UTF-8 name in `Content-Disposition`.
 
+**Presence via heartbeat polling, not websockets.** Each open editor's 4 second poll first posts a heartbeat (`POST /api/documents/[id]/presence`, view access required, 404 otherwise) that upserts `document_presence`; the document GET then lists other members seen in the last 12 seconds, marked typing if they typed in the last 5, never including the requester.
+
 **Testable route handlers.** Auth reads the session from the `Request` rather than Next's request-scoped `cookies()`, so integration tests call the real handlers with real `Request` objects against Postgres.
 
 ## UX and accessibility
@@ -111,6 +113,7 @@ users              (id, email unique, name)
 documents          (id, title, content html, owner_id → users, version, created_at, updated_at)
 shares             (document_id → documents, user_id → users, role viewer|editor), primary key on the pair
 sessions           (token, user_id → users, created_at, expires_at)
+document_presence  (document_id → documents, user_id → users, last_seen, typing_at), primary key on the pair
 schema_migrations  (name, applied_at)
 ```
 

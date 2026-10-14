@@ -25,8 +25,17 @@ export async function getDocument(docId: string, userId: string) {
   const { doc, access } = await loadForUser(docId, userId);
   const role = getRole(access, userId)!;
   // Only the owner sees the full share list; others just see the owner.
-  const collaborators = role === "owner" ? await repo.listCollaborators(docId) : [];
-  return { ...doc, role, collaborators };
+  const [collaborators, presence] = await Promise.all([
+    role === "owner" ? repo.listCollaborators(docId) : Promise.resolve([]),
+    repo.listPresence(docId, userId),
+  ]);
+  return { ...doc, role, collaborators, presence };
+}
+
+/** Heartbeat from an open editor. Anyone who can view the document may report presence. */
+export async function reportPresence(docId: string, userId: string, typing: boolean) {
+  await loadForUser(docId, userId);
+  await repo.touchPresence(docId, userId, typing);
 }
 
 export async function createDocument(userId: string, title?: string, content = "") {

@@ -16,7 +16,7 @@ import { useNow } from "./useNow";
 import { editorExtensions } from "@/lib/editorExtensions";
 import { relativeTime } from "@/lib/time";
 import type { Role } from "@/lib/access";
-import type { Collaborator } from "@/server/repo";
+import type { Collaborator, PresenceEntry } from "@/server/repo";
 
 interface Props {
   doc: {
@@ -39,6 +39,23 @@ const FAILURE: Partial<Record<SaveState, string>> = {
   readonly: "Not saved",
 };
 
+const ROLE_LABEL = { owner: "Owner", editor: "Can edit", viewer: "Can view" } as const;
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+}
+
+function typingLabel(others: PresenceEntry[]) {
+  const names = others.filter((p) => p.isTyping).map((p) => p.name);
+  if (names.length === 0) return "";
+  return names.length === 1 ? `${names[0]} is typing…` : `${names.join(" and ")} are typing…`;
+}
+
 const REMOTE_LABEL_MS = 4000; // how long "Updated by another user" stays up
 const SAVED_LABEL_MS = 60_000; // show "Saved" for a minute after a confirmed save, then "Edited … ago"
 
@@ -55,6 +72,7 @@ export default function DocumentEditor({ doc, role }: Props) {
   const lastEditAt = useRef<number | null>(null);
   const savedTitle = useRef(doc.title); // the title last committed or received; differs from `title` while typing one
   const [remoteAt, setRemoteAt] = useState<number | null>(null);
+  const [others, setOthers] = useState<PresenceEntry[]>([]);
   // A renamed document should update in the sidebar and lists.
   const saver = useDocumentSaver(doc.id, doc.version, { onSaved: (patch) => patch.title !== undefined && router.refresh() });
   // A 403 on save means an owner downgraded us to viewer while we were editing.
@@ -97,6 +115,7 @@ export default function DocumentEditor({ doc, role }: Props) {
     isBusy: () => saver.isBusy() || title !== savedTitle.current,
     lastEditAt: () => lastEditAt.current,
     onRemote: applyRemote,
+    onPresence: setOthers,
     onStop: saver.stop,
   });
 
@@ -189,6 +208,28 @@ export default function DocumentEditor({ doc, role }: Props) {
             </>
           )}
         </span>
+        <span aria-live="polite" className="hidden px-1 text-sm italic text-ink-muted sm:inline">
+          {typingLabel(others)}
+        </span>
+        {others.length > 0 && (
+          <ul aria-label="Also viewing" className="flex shrink-0 -space-x-1 px-1">
+            {others.map((p) => {
+              const label = `${p.name} · ${ROLE_LABEL[p.role]}`;
+              return (
+                <li key={p.id}>
+                  <span
+                    title={label}
+                    aria-label={label}
+                    role="img"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#e3e2de] text-xs font-medium text-ink ring-2 ring-white"
+                  >
+                    {initials(p.name)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         <Popover
           buttonContent={
             <>

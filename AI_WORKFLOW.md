@@ -34,12 +34,12 @@ I set the scope and priorities, then had Claude generate code one layer at a tim
 - **Implicit requirements → written acceptance criteria.** `SUBMISSION.md` now maps each requirement to the test or manual step that verifies it, and `ARCHITECTURE.md` lists the permission matrix and failure scenarios.
 - Browser verification caught that opening a document triggered a save (Tiptap's setEditable emits an update by default), causing false edit conflicts. Fixed and added a regression check.
 - UI redesign (sidebar, home dashboard, writing-first editor) and the Markdown and plain text download feature were implemented by Claude Code.
-- Live updates by polling (others' saved changes appear within about 5 seconds) were implemented by Claude Code.
+- Live updates by polling (others' saved changes appear within about 5 seconds), presence avatars with a typing indicator, and moving the functions to Singapore next to the database were implemented by Claude Code.
 - **Flaky test scripts.** Two failures were in test code, not the app (a click during navigation, and a helper that assumed every response was JSON). I fixed the tests and confirmed the app was correct.
 
 ## How I verified it
 
-- **52 automated tests:** 36 unit tests and 16 integration tests against a real Postgres database
+- **53 automated tests:** 36 unit tests and 17 integration tests against a real Postgres database
 - **Lint, type check, and production build** all clean, and run in CI on every push
 - **Migration upgrade path:** ran the new migrations against a database created with the old schema and confirmed existing data survived
 - **Browser tests (Playwright):** formatting persists after reload, viewers get a read-only editor with no toolbar or share panel, a real two-user edit conflict shows the warning and resolves correctly, and deleted documents return "not found" for collaborators. No browser console errors.

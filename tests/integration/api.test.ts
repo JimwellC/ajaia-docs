@@ -8,6 +8,7 @@ import * as importRoute from "@/app/api/import/route";
 import * as session from "@/app/api/session/route";
 import * as health from "@/app/api/health/route";
 import * as exportRoute from "@/app/api/documents/[id]/export/route";
+import * as presence from "@/app/api/documents/[id]/presence/route";
 import { getPool } from "@/lib/db";
 import { JIMWELL, JIM, JC, call, resetDb, sessionCookie } from "./helpers";
 
@@ -223,5 +224,31 @@ describe.skipIf(!hasDb)("health check", () => {
     } finally {
       await getPool().query("INSERT INTO schema_migrations (name, applied_at) VALUES ($1, $2)", [name, rows[0].applied_at]);
     }
+  });
+});
+
+describe.skipIf(!hasDb)("presence", () => {
+  beforeEach(resetDb);
+
+  it("shows other members, hides self, expires after 12 seconds, and 404s for non-members", async () => {
+    const id = await createDoc(JIMWELL, "Presence");
+    expect((await call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json: { email: "jim@ajaia.test", role: "editor" } })).status).toBe(201);
+
+    // Non-members can't report presence and don't learn the document exists.
+    expect((await call(presence.POST, { method: "POST", as: JC, params: { id }, json: { typing: false } })).status).toBe(404);
+
+    expect((await call(presence.POST, { method: "POST", as: JIM, params: { id }, json: { typing: true } })).status).toBe(204);
+    expect((await call(presence.POST, { method: "POST", as: JIMWELL, params: { id }, json: { typing: false } })).status).toBe(204);
+
+    const owner = await call(document.GET, { as: JIMWELL, params: { id } });
+    expect(owner.body.presence).toEqual([{ id: JIM, name: "Jim", role: "editor", isTyping: true }]);
+    const jim = await call(document.GET, { as: JIM, params: { id } });
+    expect(jim.body.presence).toEqual([{ id: JIMWELL, name: "Jimwell Calma", role: "owner", isTyping: false }]);
+
+    // Typing expires after 5 seconds, presence after 12.
+    await getPool().query("UPDATE document_presence SET typing_at = now() - interval '6 seconds' WHERE user_id = $1", [JIM]);
+    expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.presence[0].isTyping).toBe(false);
+    await getPool().query("UPDATE document_presence SET last_seen = now() - interval '13 seconds' WHERE user_id = $1", [JIM]);
+    expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.presence).toEqual([]);
   });
 });

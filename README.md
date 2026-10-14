@@ -30,6 +30,7 @@ Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on
 - Rich text: headings (H1 to H3), bold, italic, underline, strikethrough, inline code, links, bulleted and numbered lists, quotes, code blocks, dividers, undo and redo, with keyboard shortcuts and Markdown-style typing shortcuts
 - Autosave with a visible status, retry on failure, and a warning before leaving with unsaved changes
 - **Live updates:** while a document is open, saved changes from other people appear within about 5 seconds (polling every 4 seconds while the tab is visible). If you have unsaved edits or typed in the last 2 seconds, your work is never replaced; the next save uses the conflict check instead. Live keystroke co-editing and presence are out of scope.
+- **Presence:** initials avatars in the top bar show who else has the document open (tooltip with their access), and "Jim is typing…" appears next to the save status.
 - **Edit conflict detection:** every save carries the version it was based on; stale saves are rejected and the user chooses "Load their version" or "Keep mine"
 - **Import** `.txt`, `.md`, and `.docx` (up to 2 MB) as a new editable document
 - **Sharing** by email with **Can edit** or **Can view** access, changeable or removable by the owner

@@ -5,6 +5,9 @@ import { useEffect, useRef } from "react";
 import { api, ApiError } from "@/lib/api";
 import { decideRemoteUpdate, POLL_INTERVAL_MS } from "@/lib/liveUpdate";
 import type { Latest } from "./useDocumentSaver";
+import type { PresenceEntry } from "@/server/repo";
+
+const TYPING_REPORT_MS = 3000; // report "typing" if the user typed this recently
 
 interface Options {
   docId: string;
@@ -13,6 +16,7 @@ interface Options {
   isBusy: () => boolean; // unsaved local work, including an uncommitted title
   lastEditAt: () => number | null;
   onRemote: (latest: Latest) => void;
+  onPresence: (others: PresenceEntry[]) => void;
   onStop: (reason: "gone" | "readonly") => void;
 }
 
@@ -30,9 +34,16 @@ export function useLiveUpdates(options: Options) {
       if (running || cancelled || document.visibilityState !== "visible") return;
       running = true;
       try {
-        const latest = await api<Latest>(`/api/documents/${docId}`, { cache: "no-store" });
+        // Presence heartbeat first, so this poll's GET already reflects it for others.
+        const edited = opts.current.lastEditAt();
+        await api(`/api/documents/${docId}/presence`, {
+          method: "POST",
+          json: { typing: edited !== null && Date.now() - edited < TYPING_REPORT_MS },
+        });
+        const latest = await api<Latest & { presence?: PresenceEntry[] }>(`/api/documents/${docId}`, { cache: "no-store" });
         if (cancelled) return;
         const o = opts.current;
+        o.onPresence(latest.presence ?? []);
         const decision = decideRemoteUpdate({
           serverVersion: latest.version,
           localVersion: o.getVersion(),
@@ -50,6 +61,7 @@ export function useLiveUpdates(options: Options) {
       }
     }
 
+    void check(); // announce presence right away
     const interval = setInterval(check, POLL_INTERVAL_MS);
     const onVisible = () => document.visibilityState === "visible" && void check();
     document.addEventListener("visibilitychange", onVisible);
