@@ -30,14 +30,15 @@ I set the scope and priorities, then had Claude generate code one layer at a tim
 - **Scope cuts.** I removed a working Markdown export feature. It was tested and fine, but a smaller release with stronger guarantees is a better product decision for this brief than one more feature.
 - **User id cookie → server-side sessions.** The cookie held a raw user id, so anyone could impersonate anyone by editing it; it now holds a random token looked up in a `sessions` table, and sign-out revokes it.
 - **Trusting client HTML → server-side sanitization.** Saved and imported HTML now passes through an allowlist that matches the editor, so scripts, event handlers, iframes, and styles never reach the database.
-- **Generic save errors → specific recovery.** A 404 stops saving and links back, a 403 switches to read-only, a network failure retries every 5 seconds, and "All changes saved" appears only after the server confirms.
+- **Generic save errors → specific recovery.** A 404 stops saving and links back, a 403 switches to read-only, a network failure retries every 5 seconds, and "Saved" appears only after the server confirms.
 - **Implicit requirements → written acceptance criteria.** `SUBMISSION.md` now maps each requirement to the test or manual step that verifies it, and `ARCHITECTURE.md` lists the permission matrix and failure scenarios.
 - Browser verification caught that opening a document triggered a save (Tiptap's setEditable emits an update by default), causing false edit conflicts. Fixed and added a regression check.
+- UI redesign (sidebar, home dashboard, writing-first editor) and the Markdown and plain text download feature were implemented by Claude Code.
 - **Flaky test scripts.** Two failures were in test code, not the app (a click during navigation, and a helper that assumed every response was JSON). I fixed the tests and confirmed the app was correct.
 
 ## How I verified it
 
-- **39 automated tests:** 25 unit tests and 14 integration tests against a real Postgres database
+- **48 automated tests:** 32 unit tests and 16 integration tests against a real Postgres database
 - **Lint, type check, and production build** all clean, and run in CI on every push
 - **Migration upgrade path:** ran the new migrations against a database created with the old schema and confirmed existing data survived
 - **Browser tests (Playwright):** formatting persists after reload, viewers get a read-only editor with no toolbar or share panel, a real two-user edit conflict shows the warning and resolves correctly, and deleted documents return "not found" for collaborators. No browser console errors.

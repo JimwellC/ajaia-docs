@@ -61,7 +61,7 @@ function Btn({
       title={shortcut ? `${label} (${formatShortcut(shortcut, mac)})` : label}
       disabled={disabled}
       className={`inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md px-2 text-sm transition disabled:opacity-40 ${
-        active ? "bg-stone-900 text-white" : "text-stone-700 hover:bg-stone-200"
+        active ? "bg-selected text-ink" : "text-ink-muted hover:bg-hover hover:text-ink"
       }`}
     >
       {children}
@@ -69,7 +69,7 @@ function Btn({
   );
 }
 
-const Sep = () => <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-stone-300" />;
+const Sep = () => <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-line" />;
 
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -83,10 +83,13 @@ export default function Toolbar({
   editor,
   linkOpen,
   setLinkOpen,
+  stickyTop = 0,
 }: {
   editor: Editor | null;
   linkOpen: boolean;
   setLinkOpen: (open: boolean) => void;
+  /** Distance from the top of the viewport where the toolbar sticks (below the page's top bar). */
+  stickyTop?: number;
 }) {
   const [mac, setMac] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -109,15 +112,15 @@ export default function Toolbar({
     }
   }
 
-  if (!editor) return <div className="h-11" />;
+  if (!editor) return <div className="h-11 border-b border-line" />;
   const c = () => editor.chain().focus();
   const icon = { size: 16, strokeWidth: 2.25, "aria-hidden": true } as const;
 
   return (
     <>
-      <div className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 backdrop-blur">
+      <div style={{ top: stickyTop }} className="sticky z-10 border-b border-line bg-white">
         {/* Scrolls sideways within itself on narrow screens; wraps on wider ones. Never scrolls the page. */}
-        <div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5 overflow-x-auto px-3 py-1.5 sm:flex-wrap">
+        <div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5 overflow-x-auto py-1.5 sm:flex-wrap">
           <Group label="History">
             <Btn mac={mac} label="Undo" shortcut="Mod+Z" onClick={() => c().undo().run()} disabled={!editor.can().undo()}>
               <Undo2 {...icon} />
@@ -179,9 +182,9 @@ export default function Toolbar({
         {linkOpen && <LinkPopover editor={editor} onClose={() => setLinkOpen(false)} />}
       </div>
       {showHint && (
-        <div className="flex items-start justify-between gap-3 border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-700">
+        <div className="mt-2 flex items-start justify-between gap-3 rounded-md bg-sidebar px-3 py-2 text-sm text-ink-muted">
           <p>Tip: type # for a heading, - for a list, &gt; for a quote, ``` for code.</p>
-          <button type="button" onClick={dismissHint} aria-label="Dismiss tip" className="shrink-0 rounded p-0.5 text-stone-600 hover:bg-stone-200">
+          <button type="button" onClick={dismissHint} aria-label="Dismiss tip" className="shrink-0 rounded p-0.5 text-ink-muted hover:bg-hover">
             <X size={16} aria-hidden="true" />
           </button>
         </div>
@@ -237,9 +240,9 @@ function LinkPopover({ editor, onClose }: { editor: Editor; onClose: () => void 
           close();
         }
       }}
-      className="absolute inset-x-3 top-full z-20 mt-1 rounded-lg border border-stone-200 bg-white p-3 shadow-lg sm:left-auto sm:w-80"
+      className="absolute inset-x-0 top-full z-20 mt-1 rounded-lg bg-white p-3 shadow-lg ring-1 ring-black/10 sm:left-auto sm:w-80"
     >
-      <label htmlFor="link-url" className="block text-xs font-medium text-stone-700">
+      <label htmlFor="link-url" className="block text-xs font-medium text-ink">
         Link URL (http, https, or mailto)
       </label>
       <input
@@ -255,7 +258,7 @@ function LinkPopover({ editor, onClose }: { editor: Editor; onClose: () => void 
         placeholder="https://example.com"
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? "link-url-error" : undefined}
-        className="mt-1 w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm"
+        className="mt-1 w-full rounded-md border border-line bg-white px-2 py-1.5 text-sm"
       />
       {error && (
         <p id="link-url-error" role="alert" className="mt-1 text-xs text-red-700">
@@ -263,13 +266,13 @@ function LinkPopover({ editor, onClose }: { editor: Editor; onClose: () => void 
         </p>
       )}
       <div className="mt-2 flex flex-wrap gap-2 text-sm">
-        <button type="submit" className="rounded-md bg-stone-900 px-3 py-1 text-white">
+        <button type="submit" className="rounded-md bg-ink px-3 py-1 text-white hover:bg-black">
           Apply
         </button>
-        <button type="button" onClick={remove} disabled={!inLink} className="rounded-md border border-stone-300 px-3 py-1 disabled:opacity-50">
+        <button type="button" onClick={remove} disabled={!inLink} className="rounded-md px-3 py-1 ring-1 ring-line hover:bg-hover disabled:opacity-50">
           Remove link
         </button>
-        <button type="button" onClick={close} className="px-2 py-1 text-stone-700 underline">
+        <button type="button" onClick={close} className="px-2 py-1 text-ink-muted underline">
           Cancel
         </button>
       </div>
