@@ -1,5 +1,5 @@
 // Turns an uploaded file into a title and editor-ready HTML.
-import { marked } from "marked";
+import { Marked } from "marked";
 import mammoth from "mammoth";
 import { AppError } from "@/server/errors";
 
@@ -37,10 +37,14 @@ export function textToHtml(text: string) {
     .join("");
 }
 
+// Images aren't supported by the editor, so they import as their alt text (the readable part).
+// Other unsupported markup, such as tables, is unwrapped by the sanitizer, keeping its text.
+const markdown = new Marked({ gfm: true, renderer: { image: ({ text }) => text } });
+
 export async function markdownToHtml(md: string) {
   // Raw HTML inside markdown is escaped rather than passed through.
   const safe = md.replace(/</g, "&lt;");
-  return marked.parse(safe, { async: true, gfm: true });
+  return markdown.parse(safe, { async: true });
 }
 
 export async function fileToDocument(

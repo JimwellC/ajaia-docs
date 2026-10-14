@@ -76,11 +76,26 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 
 **404 for no access, 403 for wrong role.** Non-members can't tell whether a document exists. Members trying something their role doesn't allow get a 403 with a clear message.
 
-**Documents stored as HTML, not JSON.** HTML is Tiptap's native input and output format, and every import (`.txt`, `.md`, `.docx`) produces HTML directly, so there is one format at rest with no conversion layer. Because HTML can carry scripts, the server sanitizes it before every save and import (`src/server/sanitize.ts`) with an allowlist that matches the editor exactly: paragraphs, line breaks, H1 to H3, bold, italic, underline, lists, blockquote, and code. No attributes, links, images, scripts, or styles survive. Markdown import also escapes raw HTML first. Tiptap JSON would need its own validation and a converter for every import format, without being safer than an allowlist.
+**Documents stored as HTML, not JSON.** HTML is Tiptap's native input and output format, and every import (`.txt`, `.md`, `.docx`) produces HTML directly, so there is one format at rest with no conversion layer. Because HTML can carry scripts, the server sanitizes it before every save and import (`src/server/sanitize.ts`) with a strict allowlist. Scripts, styles, event handlers, images, and every attribute except a link's `href` are removed; links keep only http, https, and mailto URLs and always get `rel="noopener noreferrer nofollow"` and `target="_blank"`. Markdown import also escapes raw HTML first. Tiptap JSON would need its own validation and a converter for every import format, without being safer than an allowlist.
+
+**Editor and sanitizer kept identical.** The editor's extension list lives in one file (`src/lib/editorExtensions.ts`) and the allowlist in another (`src/server/sanitize.ts`), each pointing to the other, and both use the same link rules (`src/lib/linkUrl.ts`). A unit test builds a document containing every supported node and mark, including links, renders it with the shared extension list, sanitizes it, and asserts the HTML is byte for byte unchanged. So nothing a user can create is silently lost on save, and nothing beyond it is ever stored. To keep the allowlist attribute free, code blocks carry no language and numbered lists always start at 1. Imports follow the same rules: unsupported Markdown such as images and tables keeps its readable text (alt text, cell text) and loses only the markup, while Markdown links and strikethrough import as real formatting.
+
+**Formatting scope.** Supported: paragraphs, H1 to H3, bold, italic, underline, strikethrough, bulleted and numbered lists, quotes, code blocks, inline code, dividers, line breaks, and links. Images, tables, colors, fonts, and alignment were left out deliberately: images need file storage, tables need a much larger schema and editing UI, and colors, fonts, and alignment need style attributes, any of which would weaken the strict allowlist.
+
+**Deployment health check.** `GET /api/health` returns 200 only when the database answers and every file in `db/migrations` is recorded in `schema_migrations`; otherwise 503 with the pending names. It needs no sign-in and never echoes connection details. The README's deployment checklist runs migrations before deploying and confirms this endpoint after.
 
 **Postgres with plain SQL and versioned migrations.** I started with Prisma, but its engine binaries couldn't be downloaded in my build environment. Three tables don't need an ORM, so SQL lives in one repository file and schema changes are numbered migration files applied once each and tracked in `schema_migrations`. The second migration (versions and roles) upgraded the already-deployed database without data loss: existing shares became editors.
 
 **Testable route handlers.** Auth reads the session from the `Request` rather than Next's request-scoped `cookies()`, so integration tests call the real handlers with real `Request` objects against Postgres.
+
+## UX and accessibility
+
+Checked against a local production build with Playwright:
+
+- **axe scan** (`@axe-core/playwright`, all rules) of the sign-in page, both dashboard tabs, the editor as owner, the editor as viewer, the link popover showing an error, and the conflict banner. Before this pass it found 4 serious color contrast issues (gray status and helper text on the light gray page) and 1 moderate missing page heading on the editor. After darkening that text, and giving the editor page a visually hidden heading with the document title, every scanned state reports 0 violations of any severity.
+- **Keyboard only:** signing in, creating a document, typing, bold (Ctrl+B or ⌘B), adding a link (Ctrl+K or ⌘K opens the link popover), reaching the toolbar, and sharing all work without a mouse. Every element reached with Tab showed a visible focus ring.
+- **375px width:** sign-in, not found, both dashboard tabs, and the editor as owner and viewer have no horizontal page scroll. The header fits on one line, the toolbar scrolls sideways within itself, and the sharing panel stacks below the editor. See `docs/screenshots/09-mobile-editor.png` and `10-mobile-dashboard.png`.
+- **Failure states in a real browser:** offline with automatic retry, access downgraded to viewer, document deleted while editing, and an edit conflict resolved with "Load their version". See screenshots 06 to 08.
 
 ## Data model
 

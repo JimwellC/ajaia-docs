@@ -26,7 +26,7 @@ describe("document HTML sanitization", () => {
 
   it("keeps the formatting the editor produces", () => {
     const html =
-      "<h1>Goals</h1><h2>Sub</h2><h3>Small</h3><p><strong>Ship</strong> <em>it</em> <u>now</u><br />next</p>" +
+      "<h1>Goals</h1><h2>Sub</h2><h3>Small</h3><p><strong>Ship</strong> <em>it</em> <u>now</u><br>next</p>" +
       "<ul><li><p>one</p></li></ul><ol><li><p>two</p></li></ol><blockquote><p>quote</p></blockquote>" +
       "<pre><code>code()</code></pre><p><b>b</b><i>i</i><code>c</code></p>";
     expect(sanitizeDocumentHtml(html)).toBe(html);

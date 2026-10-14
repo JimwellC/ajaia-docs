@@ -39,7 +39,7 @@ export default function CreateActions() {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-start gap-1 sm:items-end">
       <div className="flex gap-2">
         <button
           onClick={() => fileInput.current?.click()}
@@ -63,8 +63,8 @@ export default function CreateActions() {
           onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
         />
       </div>
-      <p className="text-xs text-stone-500">Import supports .txt, .md and .docx (max 2 MB)</p>
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
+      <p className="text-xs text-stone-600">Import supports .txt, .md and .docx (max 2 MB)</p>
+      {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
     </div>
   );
 }

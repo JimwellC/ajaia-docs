@@ -64,6 +64,17 @@ export async function deleteSession(token: string) {
   await q().query("DELETE FROM sessions WHERE token = $1", [token]);
 }
 
+/** Names of applied migrations, or [] if the tracking table doesn't exist yet. */
+export async function listAppliedMigrations() {
+  try {
+    const { rows } = await q().query<{ name: string }>("SELECT name FROM schema_migrations");
+    return rows.map((r) => r.name);
+  } catch (e) {
+    if ((e as { code?: string }).code === "42P01") return []; // undefined_table
+    throw e;
+  }
+}
+
 export async function listUsers() {
   const { rows } = await q().query<User>("SELECT id, email, name FROM users ORDER BY name");
   return rows;

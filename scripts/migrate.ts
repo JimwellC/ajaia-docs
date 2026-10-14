@@ -1,14 +1,15 @@
 // Applies db/migrations/*.sql in order, once each, tracked in schema_migrations.
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Pool } from "pg";
+import { listMigrationFiles, MIGRATIONS_DIR } from "../src/server/migrations";
 
 export async function migrate(pool: Pool, log = console.log) {
   await pool.query(
     "CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
   );
-  const dir = join(process.cwd(), "db/migrations");
-  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  const dir = MIGRATIONS_DIR;
+  const files = listMigrationFiles(dir);
   const { rows } = await pool.query<{ name: string }>("SELECT name FROM schema_migrations");
   const applied = new Set(rows.map((r) => r.name));
 

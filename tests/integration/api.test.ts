@@ -6,6 +6,8 @@ import * as shares from "@/app/api/documents/[id]/shares/route";
 import * as share from "@/app/api/documents/[id]/shares/[userId]/route";
 import * as importRoute from "@/app/api/import/route";
 import * as session from "@/app/api/session/route";
+import * as health from "@/app/api/health/route";
+import { getPool } from "@/lib/db";
 import { ALICE, BOB, CAROL, call, resetDb, sessionCookie } from "./helpers";
 
 const hasDb = Boolean(process.env.TEST_DATABASE_URL);
@@ -165,5 +167,32 @@ describe.skipIf(!hasDb)("documents API", () => {
     });
     const res = await documents.POST(req, { params: Promise.resolve({}) } as never);
     expect(res.status).toBe(400);
+  });
+});
+
+describe.skipIf(!hasDb)("health check", () => {
+  const get = async () => {
+    const res = await health.GET();
+    return { status: res.status, body: await res.json(), cache: res.headers.get("cache-control") };
+  };
+
+  it("returns 200 when the database is reachable and every migration is applied", async () => {
+    const res = await get();
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, database: "ok", pendingMigrations: [] });
+    expect(res.cache).toBe("no-store");
+  });
+
+  it("returns 503 and names the migration when one is pending, without connection details", async () => {
+    const name = "003_sessions.sql";
+    const { rows } = await getPool().query("DELETE FROM schema_migrations WHERE name = $1 RETURNING applied_at", [name]);
+    try {
+      const res = await get();
+      expect(res.status).toBe(503);
+      expect(res.body).toEqual({ ok: false, database: "ok", pendingMigrations: [name] });
+      expect(JSON.stringify(res.body)).not.toMatch(/postgres|localhost|password/i);
+    } finally {
+      await getPool().query("INSERT INTO schema_migrations (name, applied_at) VALUES ($1, $2)", [name, rows[0].applied_at]);
+    }
   });
 });

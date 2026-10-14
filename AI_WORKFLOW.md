@@ -36,7 +36,7 @@ I set the scope and priorities, then had Claude generate code one layer at a tim
 
 ## How I verified it
 
-- **30 automated tests:** 18 unit tests and 12 integration tests against a real Postgres database
+- **39 automated tests:** 25 unit tests and 14 integration tests against a real Postgres database
 - **Lint, type check, and production build** all clean, and run in CI on every push
 - **Migration upgrade path:** ran the new migrations against a database created with the old schema and confirmed existing data survived
 - **Browser tests (Playwright):** formatting persists after reload, viewers get a read-only editor with no toolbar or share panel, a real two-user edit conflict shows the warning and resolves correctly, and deleted documents return "not found" for collaborators. No browser console errors.

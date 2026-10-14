@@ -24,7 +24,7 @@ Sign-in is mocked: pick a user on the sign-in screen and use **Switch user** to 
 ## Features
 
 - Create, rename, edit, reopen, and delete documents
-- Rich text: bold, italic, underline, headings (H1 to H3), bulleted and numbered lists, undo and redo
+- Rich text: headings (H1 to H3), bold, italic, underline, strikethrough, inline code, links, bulleted and numbered lists, quotes, code blocks, dividers, undo and redo, with keyboard shortcuts and Markdown-style typing shortcuts
 - Autosave with a visible status, retry on failure, and a warning before leaving with unsaved changes
 - **Edit conflict detection:** every save carries the version it was based on; stale saves are rejected and the user chooses "Load their version" or "Keep mine"
 - **Import** `.txt`, `.md`, and `.docx` (up to 2 MB) as a new editable document
@@ -55,8 +55,8 @@ npm test                 # unit tests; add TEST_DATABASE_URL to also run API int
 TEST_DATABASE_URL=postgresql://... npm test
 ```
 
-- **Unit tests:** access rules, request validation, file import
-- **Integration tests:** call the real route handlers against a real Postgres database, covering auth, editing, edit conflicts, every permission level, sharing validation, and import. They use a separate database that gets reset before each test.
+- **Unit tests:** access rules, request validation, file import, HTML sanitization, and a check that the editor's output passes the sanitizer unchanged
+- **Integration tests:** call the real route handlers against a real Postgres database, covering sessions, editing, edit conflicts, every permission level, sharing validation, import, sanitization, and the health check. They use a separate database that gets reset before each test.
 - **CI:** GitHub Actions runs lint, type check, all tests against a Postgres service, and a production build on every push.
 
 ## Deploy (Vercel + Neon, both free)
@@ -64,6 +64,16 @@ TEST_DATABASE_URL=postgresql://... npm test
 1. Create a Neon project and copy the connection string.
 2. Run `DATABASE_URL="<neon url>" npm run db:setup`. Run this before deploying new code too, so migrations are applied first.
 3. Import the repo in Vercel, add `DATABASE_URL`, and deploy.
+
+## Deployment checklist
+
+Run through this for every release, in this order:
+
+1. Run `npm run lint`, `npm run typecheck`, and `npm test` (with `TEST_DATABASE_URL` pointing at a throwaway database, never production, because the integration tests truncate tables).
+2. Run `npm run db:setup` against production so new migrations are applied before new code depends on them. It is safe to rerun and prints each migration it applies.
+3. Deploy (`vercel deploy --prod`).
+4. Confirm `GET /api/health` returns 200 with `{"ok":true,"database":"ok","pendingMigrations":[]}`. It returns 503 if the database is unreachable or any file in `db/migrations` hasn't been applied, and never includes connection details.
+5. Smoke-test sign-in: open the live URL, sign in as a demo user, and open a document.
 
 ## Project structure
 
@@ -80,6 +90,10 @@ src/server/
   handler.ts              Route wrapper: consistent JSON errors, no leaked internals
   auth.ts                 Demo sign-in backed by server-side sessions (random token cookie)
   sanitize.ts             HTML allowlist applied before any document content is saved
+  health.ts               Database and migration status for /api/health
+  migrations.ts           Lists migration files (shared by the migration runner and the health check)
+src/lib/editorExtensions.ts  The editor's formatting scope, kept identical to the sanitizer allowlist
+src/lib/linkUrl.ts        Link URL rules (http, https, mailto) shared by the editor and the sanitizer
 src/app/api/              Thin route handlers: parse, call a service, respond
 src/components/           Editor, save queue hook, toolbar, share panel, document list
 tests/unit/               Pure logic tests

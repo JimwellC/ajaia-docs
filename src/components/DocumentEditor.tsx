@@ -3,13 +3,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
 import Toolbar from "./Toolbar";
 import SharePanel from "./SharePanel";
 import { useDocumentSaver, type SaveState } from "./useDocumentSaver";
 import { api } from "@/lib/api";
+import { editorExtensions } from "@/lib/editorExtensions";
 import type { Role } from "@/lib/access";
 import type { Collaborator } from "@/server/repo";
 
@@ -40,25 +39,34 @@ export default function DocumentEditor({ doc, role }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState(doc.title);
   const [titleError, setTitleError] = useState("");
+  const [linkOpen, setLinkOpen] = useState(false);
   const saver = useDocumentSaver(doc.id, doc.version);
   // A 403 on save means an owner downgraded us to viewer while we were editing.
   const readOnly = role === "viewer" || saver.state === "readonly";
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Underline,
-      Placeholder.configure({ placeholder: readOnly ? "" : "Start writing…" }),
-    ],
+    extensions: [...editorExtensions, Placeholder.configure({ placeholder: readOnly ? "" : "Start writing…" })],
     content: doc.content,
     editable: !readOnly,
     immediatelyRender: false,
-    editorProps: { attributes: { class: "doc-content", "aria-label": "Document content" } },
+    editorProps: {
+      attributes: { class: "doc-content", "aria-label": "Document content" },
+      handleKeyDown: (view, event) => {
+        // Ctrl+K / Cmd+K opens the link popover.
+        if (view.editable && (event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "k") {
+          event.preventDefault();
+          setLinkOpen(true);
+          return true;
+        }
+        return false;
+      },
+    },
     onUpdate: ({ editor }) => saver.schedule({ content: editor.getHTML() }),
   });
 
   useEffect(() => {
-    editor?.setEditable(!readOnly);
+    // emitUpdate=false: toggling editability must not look like an edit (that would trigger a save).
+    if (editor && editor.isEditable === readOnly) editor.setEditable(!readOnly, false);
   }, [editor, readOnly]);
 
   function commitTitle() {
@@ -90,7 +98,7 @@ export default function DocumentEditor({ doc, role }: Props) {
           <Link href="/" className="text-stone-600 hover:text-stone-900">← All documents</Link>
           {!readOnly && (
             <span
-              className={["error", "offline", "conflict", "gone"].includes(saver.state) ? "text-red-600" : "text-stone-500"}
+              className={["error", "offline", "conflict", "gone"].includes(saver.state) ? "text-red-700" : "text-stone-600"}
               aria-live="polite"
             >
               {saver.state === "error" ? saver.error || STATUS.error : STATUS[saver.state]}{" "}
@@ -129,6 +137,7 @@ export default function DocumentEditor({ doc, role }: Props) {
           </div>
         )}
 
+        <h1 className="sr-only">{title || doc.title}</h1>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -137,9 +146,9 @@ export default function DocumentEditor({ doc, role }: Props) {
           readOnly={readOnly}
           maxLength={120}
           aria-label="Document title"
-          className="w-full rounded-md bg-transparent px-1 text-2xl font-bold outline-none read-only:cursor-default hover:bg-white focus:bg-white focus:ring-2 focus:ring-stone-300 read-only:hover:bg-transparent read-only:focus:ring-0"
+          className="w-full rounded-md bg-transparent px-1 text-2xl font-bold outline-none read-only:cursor-default hover:bg-white focus:bg-white focus:ring-2 focus:ring-stone-500 read-only:hover:bg-transparent read-only:focus:ring-0"
         />
-        {titleError && <p className="mt-1 text-sm text-red-600" role="alert">{titleError}</p>}
+        {titleError && <p className="mt-1 text-sm text-red-700" role="alert">{titleError}</p>}
 
         <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
           {readOnly ? (
@@ -147,7 +156,7 @@ export default function DocumentEditor({ doc, role }: Props) {
               View only. Ask {doc.ownerName} for edit access.
             </div>
           ) : (
-            <Toolbar editor={editor} />
+            <Toolbar editor={editor} linkOpen={linkOpen} setLinkOpen={setLinkOpen} />
           )}
           <div className="px-8 py-6 sm:px-12">
             <EditorContent editor={editor} />
@@ -161,7 +170,7 @@ export default function DocumentEditor({ doc, role }: Props) {
           <p className="font-medium">{role === "owner" ? "You" : doc.ownerName}</p>
           {role !== "owner" && (
             <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-amber-800">
-              Shared with you · {role === "editor" ? "can edit" : "can view"}
+              Shared with you · {role === "editor" && !readOnly ? "can edit" : "can view"}
             </p>
           )}
           {role === "owner" && (

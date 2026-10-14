@@ -11,15 +11,16 @@ export default function Header({ name }: { name: string }) {
   }
   return (
     <header className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-        <Link href="/" className="font-bold tracking-tight">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <Link href="/" className="shrink-0 whitespace-nowrap font-bold tracking-tight">
           Ajaia Docs
         </Link>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-stone-600">
-            Signed in as <span className="font-medium text-stone-900">{name}</span>
+        <div className="flex min-w-0 items-center gap-3 text-sm">
+          <span className="min-w-0 truncate text-stone-600">
+            <span className="hidden sm:inline">Signed in as </span>
+            <span className="font-medium text-stone-900">{name}</span>
           </span>
-          <button onClick={signOut} className="rounded-lg border border-stone-300 px-3 py-1.5 hover:bg-stone-50">
+          <button onClick={signOut} className="shrink-0 whitespace-nowrap rounded-lg border border-stone-300 px-3 py-1.5 hover:bg-stone-50">
             Switch user
           </button>
         </div>

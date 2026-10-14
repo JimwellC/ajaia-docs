@@ -9,6 +9,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The health check reads db/migrations at runtime, so ship those files with the function.
+  outputFileTracingIncludes: { "/api/health": ["./db/migrations/*.sql"] },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

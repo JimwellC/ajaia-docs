@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Visible keyboard focus on every interactive element. In the base layer so a component can refine it with utilities. */
+@layer base {
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:not([tabindex="-1"]):focus-visible {
+    outline: 2px solid #1c1917;
+    outline-offset: 2px;
+  }
+}
+
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
