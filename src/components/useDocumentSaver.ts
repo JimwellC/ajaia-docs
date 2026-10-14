@@ -2,10 +2,19 @@
 // Debounced, serialized saving with optimistic concurrency.
 // Title and content changes share one queue, so saves never race each other,
 // and every save sends the version it is based on so concurrent edits are detected.
+// "saved" is only ever set after the server confirms a save.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 
-export type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
+export type SaveState =
+  | "saved"
+  | "dirty"
+  | "saving"
+  | "error" // the server rejected the save; Retry is manual
+  | "offline" // the request never reached the server; retries automatically
+  | "conflict" // someone else saved first
+  | "gone" // 404: deleted or access removed; saving stops
+  | "readonly"; // 403: downgraded to viewer; saving stops
 export interface Patch {
   title?: string;
   content?: string;
@@ -17,6 +26,9 @@ export interface Latest {
 }
 
 const DEBOUNCE_MS = 800;
+const OFFLINE_RETRY_MS = 5000;
+
+type Outcome = "ok" | "offline" | "failed";
 
 export function useDocumentSaver(docId: string, initialVersion: number) {
   const [state, setState] = useState<SaveState>("saved");
@@ -24,9 +36,10 @@ export function useDocumentSaver(docId: string, initialVersion: number) {
   const [conflict, setConflict] = useState<Latest | null>(null);
   const version = useRef(initialVersion);
   const pending = useRef<Patch | null>(null);
-  const inFlight = useRef<Promise<void> | null>(null);
+  const inFlight = useRef<Promise<Outcome> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blocked = useRef(false); // true while a conflict is unresolved
+  const blocked = useRef(false); // true while a conflict is unresolved, or for good after a 404 or 403
+  const offline = useRef(false); // true while the server is unreachable and a retry is scheduled
 
   const flush = useCallback(async (): Promise<void> => {
     if (timer.current) clearTimeout(timer.current);
@@ -35,41 +48,62 @@ export function useDocumentSaver(docId: string, initialVersion: number) {
 
     const patch = pending.current;
     pending.current = null;
-    setState("saving");
+    // While offline, keep the "can't reach the server" message up during retries.
+    if (!offline.current) setState("saving");
 
-    inFlight.current = (async () => {
+    inFlight.current = (async (): Promise<Outcome> => {
       try {
         const res = await api<{ version: number }>(`/api/documents/${docId}`, {
           method: "PATCH",
           json: { ...patch, version: version.current },
         });
         version.current = res.version;
+        offline.current = false;
         setError("");
         setState(pending.current ? "dirty" : "saved");
+        return "ok";
       } catch (e) {
         // Put the unsaved changes back (newer edits made during the request win).
         pending.current = { ...patch, ...pending.current };
-        if (e instanceof ApiError && e.code === "conflict") {
+        if (!(e instanceof ApiError)) {
+          // fetch itself threw: the server was never reached.
+          offline.current = true;
+          setState("offline");
+          return "offline";
+        }
+        offline.current = false;
+        if (e.code === "conflict") {
           blocked.current = true;
           setConflict((e.body.latest as Latest) ?? null);
           setState("conflict");
+        } else if (e.status === 404) {
+          blocked.current = true;
+          setState("gone");
+        } else if (e.status === 403) {
+          blocked.current = true;
+          setState("readonly");
         } else {
-          setError(e instanceof Error ? e.message : "Couldn't save.");
+          setError(e.message);
           setState("error");
         }
+        return "failed";
       } finally {
         inFlight.current = null;
       }
     })();
-    await inFlight.current;
-    // Changes made while the request was running get saved right after it.
-    if (pending.current && !blocked.current) timer.current = setTimeout(flush, DEBOUNCE_MS);
+    const outcome = await inFlight.current;
+    if (!pending.current || blocked.current) return;
+    if (outcome === "offline") timer.current = setTimeout(flush, OFFLINE_RETRY_MS);
+    // Changes made while a successful request was running get saved right after it.
+    // Other failures wait for the manual Retry instead of looping.
+    else if (outcome === "ok") timer.current = setTimeout(flush, DEBOUNCE_MS);
   }, [docId]);
 
   const schedule = useCallback(
     (patch: Patch, delay = DEBOUNCE_MS) => {
       pending.current = { ...pending.current, ...patch };
-      if (blocked.current) return;
+      // Blocked: never save. Offline: the scheduled retry will pick this edit up.
+      if (blocked.current || offline.current) return;
       setState("dirty");
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(flush, delay);

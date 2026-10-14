@@ -43,6 +43,27 @@ export async function findUserByEmail(email: string) {
   return rows[0] ?? null;
 }
 
+export async function insertSession(token: string, userId: string, ttlSeconds: number) {
+  await q().query(
+    "INSERT INTO sessions (token, user_id, expires_at) VALUES ($1, $2, now() + make_interval(secs => $3))",
+    [token, userId, ttlSeconds],
+  );
+}
+
+/** The user behind a session token, or null if the token is unknown or expired. */
+export async function findUserBySessionToken(token: string) {
+  const { rows } = await q().query<User>(
+    `SELECT u.id, u.email, u.name FROM sessions s JOIN users u ON u.id = s.user_id
+      WHERE s.token = $1 AND s.expires_at > now()`,
+    [token],
+  );
+  return rows[0] ?? null;
+}
+
+export async function deleteSession(token: string) {
+  await q().query("DELETE FROM sessions WHERE token = $1", [token]);
+}
+
 export async function listUsers() {
   const { rows } = await q().query<User>("SELECT id, email, name FROM users ORDER BY name");
   return rows;

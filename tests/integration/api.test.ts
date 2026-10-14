@@ -5,7 +5,8 @@ import * as document from "@/app/api/documents/[id]/route";
 import * as shares from "@/app/api/documents/[id]/shares/route";
 import * as share from "@/app/api/documents/[id]/shares/[userId]/route";
 import * as importRoute from "@/app/api/import/route";
-import { ALICE, BOB, CAROL, call, resetDb } from "./helpers";
+import * as session from "@/app/api/session/route";
+import { ALICE, BOB, CAROL, call, resetDb, sessionCookie } from "./helpers";
 
 const hasDb = Boolean(process.env.TEST_DATABASE_URL);
 
@@ -22,6 +23,48 @@ describe.skipIf(!hasDb)("documents API", () => {
     const res = await call(documents.GET);
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe("unauthenticated");
+  });
+
+  it("rejects forged and expired session cookies", async () => {
+    // A cookie holding a raw user id is not a session.
+    expect((await call(documents.GET, { cookie: `ajaia_session=${ALICE}` })).status).toBe(401);
+    expect((await call(documents.GET, { cookie: `ajaia_uid=${ALICE}` })).status).toBe(401);
+    expect((await call(documents.GET, { cookie: "ajaia_session=not-a-real-token" })).status).toBe(401);
+    expect((await call(documents.GET, { cookie: await sessionCookie(ALICE, { expired: true }) })).status).toBe(401);
+  });
+
+  it("signs in with a random token and signing out revokes it", async () => {
+    const signIn = await call(session.POST, { method: "POST", json: { userId: ALICE } });
+    expect(signIn.status).toBe(200);
+    const setCookie = signIn.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/^ajaia_session=[A-Za-z0-9_-]{43};/);
+    expect(setCookie).toMatch(/HttpOnly/i);
+    expect(setCookie.toLowerCase()).toContain("samesite=lax");
+    expect(setCookie).not.toContain(ALICE);
+    const cookie = setCookie.split(";")[0];
+
+    expect((await call(documents.GET, { cookie })).status).toBe(200);
+    expect((await call(session.DELETE, { method: "DELETE", cookie })).status).toBe(200);
+    expect((await call(documents.GET, { cookie })).status).toBe(401);
+  });
+
+  it("rejects sign-in as an unknown user", async () => {
+    expect((await call(session.POST, { method: "POST", json: { userId: "u_nobody" } })).status).toBe(400);
+  });
+
+  it("sanitizes saved and imported HTML", async () => {
+    const id = await createDoc();
+    const dirty = '<p onclick="x()">Hi</p><script>alert(1)</script><img src=x onerror=y()>';
+    const saved = await call(document.PATCH, { method: "PATCH", as: ALICE, params: { id }, json: { content: dirty, version: 1 } });
+    expect(saved.status).toBe(200);
+    expect((await call(document.GET, { as: ALICE, params: { id } })).body.content).toBe("<p>Hi</p>");
+
+    const form = new FormData();
+    form.append("file", new File(['<script>alert(1)</script>\n\n**bold**'], "x.md", { type: "text/markdown" }));
+    const imported = await call(importRoute.POST, { method: "POST", as: ALICE, body: form });
+    const content = (await call(document.GET, { as: ALICE, params: { id: imported.body.id } })).body.content;
+    expect(content).toContain("<strong>bold</strong>");
+    expect(content).not.toContain("<script");
   });
 
   it("creates, edits and reopens a document with its formatting", async () => {
@@ -117,7 +160,7 @@ describe.skipIf(!hasDb)("documents API", () => {
 
     const req = new Request("http://test.local/api", {
       method: "POST",
-      headers: { cookie: `ajaia_uid=${ALICE}`, "content-type": "application/json" },
+      headers: { cookie: await sessionCookie(ALICE), "content-type": "application/json" },
       body: "{not json",
     });
     const res = await documents.POST(req, { params: Promise.resolve({}) } as never);

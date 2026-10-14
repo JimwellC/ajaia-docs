@@ -78,7 +78,8 @@ src/server/
   validation.ts           Zod schemas for every request body
   errors.ts               Typed errors mapped to HTTP status codes
   handler.ts              Route wrapper: consistent JSON errors, no leaked internals
-  auth.ts                 Mocked session from an httpOnly cookie
+  auth.ts                 Demo sign-in backed by server-side sessions (random token cookie)
+  sanitize.ts             HTML allowlist applied before any document content is saved
 src/app/api/              Thin route handlers: parse, call a service, respond
 src/components/           Editor, save queue hook, toolbar, share panel, document list
 tests/unit/               Pure logic tests

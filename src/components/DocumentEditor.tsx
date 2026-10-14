@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -30,15 +30,19 @@ const STATUS: Record<SaveState, string> = {
   dirty: "Unsaved changes",
   saving: "Saving…",
   error: "Couldn't save.",
+  offline: "Can't reach the server. Your changes are kept here and will retry automatically.",
   conflict: "Not saved: edit conflict",
+  gone: "Not saved",
+  readonly: "Not saved",
 };
 
 export default function DocumentEditor({ doc, role }: Props) {
   const router = useRouter();
-  const readOnly = role === "viewer";
   const [title, setTitle] = useState(doc.title);
   const [titleError, setTitleError] = useState("");
   const saver = useDocumentSaver(doc.id, doc.version);
+  // A 403 on save means an owner downgraded us to viewer while we were editing.
+  const readOnly = role === "viewer" || saver.state === "readonly";
 
   const editor = useEditor({
     extensions: [
@@ -52,6 +56,10 @@ export default function DocumentEditor({ doc, role }: Props) {
     editorProps: { attributes: { class: "doc-content", "aria-label": "Document content" } },
     onUpdate: ({ editor }) => saver.schedule({ content: editor.getHTML() }),
   });
+
+  useEffect(() => {
+    editor?.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
   function commitTitle() {
     const next = title.trim();
@@ -82,16 +90,29 @@ export default function DocumentEditor({ doc, role }: Props) {
           <Link href="/" className="text-stone-600 hover:text-stone-900">← All documents</Link>
           {!readOnly && (
             <span
-              className={saver.state === "error" || saver.state === "conflict" ? "text-red-600" : "text-stone-500"}
+              className={["error", "offline", "conflict", "gone"].includes(saver.state) ? "text-red-600" : "text-stone-500"}
               aria-live="polite"
             >
               {saver.state === "error" ? saver.error || STATUS.error : STATUS[saver.state]}{" "}
-              {saver.state === "error" && (
+              {(saver.state === "error" || saver.state === "offline") && (
                 <button className="underline" onClick={() => void saver.flush()}>Retry</button>
               )}
             </span>
           )}
         </div>
+
+        {saver.state === "gone" && (
+          <div role="alert" className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+            This document was deleted or you no longer have access.{" "}
+            <Link href="/" className="font-medium underline">Back to all documents</Link>
+          </div>
+        )}
+
+        {saver.state === "readonly" && (
+          <div role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Your access changed to view-only. Your latest changes were not saved.
+          </div>
+        )}
 
         {saver.state === "conflict" && (
           <div role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

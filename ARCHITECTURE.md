@@ -14,7 +14,7 @@ The one stretch item I chose is view vs edit roles, because it deepens permissio
 ## Cut on purpose
 
 - **Real-time co-editing.** I've built real-time systems before (live bidding over Socket.IO and Redis), so I know what doing it properly costs: CRDTs such as Yjs, a websocket server, presence, and reconnection handling. That isn't a responsible fit for this timebox. Instead I made concurrent editing *safe*: conflicting saves are detected and the user decides. Nobody loses work, at a fraction of the complexity.
-- **Real authentication.** The brief allows mocked users. Every permission check runs on the server against the session, so real auth would only change how the session cookie is created.
+- **Real authentication.** The brief allows mocked users, so sign-in is a demo picker. It still issues a real server-side session, and every permission check runs against that session, so real auth would only change how a session gets issued.
 - **Comments, version history, export.** Useful, but each widens the product without strengthening the core. The `version` column is a natural base for history later.
 
 ## Request flow
@@ -31,6 +31,39 @@ Repository (src/server/repo.ts)   parameterized SQL only, no business rules
 
 Pages (server components) call the same service functions as the API, so the browser and the API can never disagree about who can see what.
 
+## Authentication vs authorization
+
+**Authentication** answers "who is this?". The demo sign-in lets you pick a seeded user, but the server then issues a real session: a random 32 byte token stored in the `sessions` table with a 7 day expiry, sent back in an httpOnly, SameSite=Lax cookie that is Secure in production. The cookie never contains a user id. On every request, `src/server/auth.ts` looks the token up, and a missing, unknown, or expired token means 401. Signing out deletes the row, so an old token stops working immediately. A cookie forged to hold a user id such as `u_alice` is just an unknown token.
+
+**Authorization** answers "may this user do this?". Every check in `src/server/documents.ts` uses only the user resolved from that session. Ids in a request body or query are never trusted for identity: the API takes the document id from the URL and decides the caller's role from the database, so a client cannot claim to be someone else or claim a role it doesn't have.
+
+## Permission matrix
+
+| Action | Owner | Editor | Viewer | No access |
+|---|---|---|---|---|
+| View | Yes | Yes | Yes | No (404) |
+| Edit content | Yes | Yes | No (403) | No (404) |
+| Rename | Yes | Yes | No (403) | No (404) |
+| Delete | Yes | No (403) | No (403) | No (404) |
+| Share | Yes | No (403) | No (403) | No (404) |
+| Change role | Yes | No (403) | No (403) | No (404) |
+| Revoke | Yes | No (403) | No (403) | No (404) |
+
+Users without access get 404 rather than 403, so they can't tell whether a document exists.
+
+## Failure scenarios
+
+| Scenario | Expected behavior |
+|---|---|
+| Refresh while saving | The browser warns before leaving while a save is pending or in flight. A request already sent still completes on the server. |
+| Save fails | The server's message is shown with a Retry button. Changes stay in the editor and in the save queue, and "All changes saved" is not shown. |
+| API unavailable | "Can't reach the server. Your changes are kept here and will retry automatically." The save retries every 5 seconds until it succeeds, and the manual Retry button stays available. |
+| Saves finish out of order | Can't happen within one tab: title and content changes share one serialized queue with at most one request in flight, and each save carries the version it was based on. |
+| Two users save the same document | The second save is based on a stale version and gets 409 with the latest content. The editor offers "Load their version" or "Keep mine", so nothing is silently overwritten. |
+| Document deleted elsewhere | The next save gets 404. Saving stops, the content stays on screen, and the editor shows "This document was deleted or you no longer have access." with a link back to all documents. |
+| Access revoked while editing | Removed entirely: same as deleted (404). Downgraded to viewer: the next save gets 403, the editor switches to read-only, and it shows "Your access changed to view-only. Your latest changes were not saved." |
+| Forged session cookie | 401. The user is resolved only by looking up the session token, so a cookie holding a user id, an unknown token, or an expired token is rejected. |
+
 ## Key decisions
 
 **Thin routes, rules in services.** Every rule ("only owners share", "viewers can't edit") lives in `src/server/documents.ts` and `src/lib/access.ts`. Route handlers only validate input and translate errors, which keeps them short and identical in shape.
@@ -43,7 +76,7 @@ Pages (server components) call the same service functions as the API, so the bro
 
 **404 for no access, 403 for wrong role.** Non-members can't tell whether a document exists. Members trying something their role doesn't allow get a 403 with a clear message.
 
-**Documents stored as HTML.** Tiptap reads and writes HTML and imports convert to HTML, so there is one format at rest. Tiptap's schema drops unsupported or unsafe markup on load, and Markdown import escapes raw HTML first.
+**Documents stored as HTML, not JSON.** HTML is Tiptap's native input and output format, and every import (`.txt`, `.md`, `.docx`) produces HTML directly, so there is one format at rest with no conversion layer. Because HTML can carry scripts, the server sanitizes it before every save and import (`src/server/sanitize.ts`) with an allowlist that matches the editor exactly: paragraphs, line breaks, H1 to H3, bold, italic, underline, lists, blockquote, and code. No attributes, links, images, scripts, or styles survive. Markdown import also escapes raw HTML first. Tiptap JSON would need its own validation and a converter for every import format, without being safer than an allowlist.
 
 **Postgres with plain SQL and versioned migrations.** I started with Prisma, but its engine binaries couldn't be downloaded in my build environment. Three tables don't need an ORM, so SQL lives in one repository file and schema changes are numbered migration files applied once each and tracked in `schema_migrations`. The second migration (versions and roles) upgraded the already-deployed database without data loss: existing shares became editors.
 
@@ -55,15 +88,16 @@ Pages (server components) call the same service functions as the API, so the bro
 users              (id, email unique, name)
 documents          (id, title, content html, owner_id → users, version, created_at, updated_at)
 shares             (document_id → documents, user_id → users, role viewer|editor), primary key on the pair
+sessions           (token, user_id → users, created_at, expires_at)
 schema_migrations  (name, applied_at)
 ```
 
-Deleting a document cascades to its shares.
+Deleting a document cascades to its shares. Deleting a user cascades to their sessions.
 
 ## Known limitations
 
 - Last save is no longer silent, but two people can't see each other's cursor or edits live
-- Mocked auth: anyone can sign in as any demo user
+- Demo sign-in: anyone can pick any demo user (but they get a real session, and cookies can't be forged)
 - No rate limiting or audit log
 
 ## What I'd build next (2 to 4 more hours)

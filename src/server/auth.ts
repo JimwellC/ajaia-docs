@@ -1,11 +1,14 @@
-// Mocked authentication: the signed-in user id lives in an httpOnly cookie.
+// Demo authentication with real server-side sessions: the cookie holds a random token,
+// and the user is resolved only by looking that token up. A user id in a cookie means nothing.
 // Reading it from the Request (not next/headers) keeps route handlers testable.
+import { randomBytes } from "node:crypto";
 import { AppError } from "./errors";
-import { findUserById, type User } from "./repo";
+import { deleteSession, findUserBySessionToken, insertSession, type User } from "./repo";
 
-export const SESSION_COOKIE = "ajaia_uid";
+export const SESSION_COOKIE = "ajaia_session";
+export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-export function readSessionId(cookieHeader: string | null): string | null {
+export function readSessionToken(cookieHeader: string | null): string | null {
   if (!cookieHeader) return null;
   for (const part of cookieHeader.split(";")) {
     const [k, ...v] = part.trim().split("=");
@@ -14,12 +17,23 @@ export function readSessionId(cookieHeader: string | null): string | null {
   return null;
 }
 
-export async function getUserFromSessionId(id: string | null | undefined): Promise<User | null> {
-  return id ? findUserById(id) : null;
+/** Missing, unknown, and expired tokens all resolve to null. */
+export async function getUserFromSessionToken(token: string | null | undefined): Promise<User | null> {
+  return token ? findUserBySessionToken(token) : null;
+}
+
+export async function createSession(userId: string): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await insertSession(token, userId, SESSION_TTL_SECONDS);
+  return token;
+}
+
+export async function endSession(token: string | null) {
+  if (token) await deleteSession(token);
 }
 
 export async function requireUser(req: Request): Promise<User> {
-  const user = await getUserFromSessionId(readSessionId(req.headers.get("cookie")));
+  const user = await getUserFromSessionToken(readSessionToken(req.headers.get("cookie")));
   if (!user) throw new AppError("unauthenticated", "Please sign in.");
   return user;
 }

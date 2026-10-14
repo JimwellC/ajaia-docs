@@ -4,6 +4,7 @@ import { canEdit, canManage, canView, checkShare, getRole, type ShareRole } from
 import { fileToDocument } from "@/lib/importFile";
 import { AppError, notFound } from "./errors";
 import * as repo from "./repo";
+import { sanitizeDocumentHtml } from "./sanitize";
 
 /** Loads a document with its grants. Missing and inaccessible look the same, so ids don't leak. */
 async function loadForUser(docId: string, userId: string) {
@@ -39,7 +40,8 @@ export async function updateDocument(
   const { access } = await loadForUser(docId, userId);
   if (!canEdit(access, userId)) throw new AppError("forbidden", "You have view-only access to this document.");
 
-  const result = await repo.updateDocumentIfVersion(docId, input.version, input);
+  const patch = { title: input.title, content: input.content === undefined ? undefined : sanitizeDocumentHtml(input.content) };
+  const result = await repo.updateDocumentIfVersion(docId, input.version, patch);
   if (!result) {
     // Someone saved since this client loaded the document. Send the latest so the UI can resolve it.
     const latest = await repo.findDocument(docId);
@@ -87,5 +89,5 @@ export async function removeShare(docId: string, userId: string, targetId: strin
 
 export async function importDocument(userId: string, filename: string, bytes: Buffer) {
   const { title, html } = await fileToDocument(filename, bytes);
-  return repo.insertDocument(userId, title, html);
+  return repo.insertDocument(userId, title, sanitizeDocumentHtml(html));
 }
