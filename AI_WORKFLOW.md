@@ -32,6 +32,7 @@ I set the scope and priorities, then had Claude generate code one layer at a tim
 - **Trusting client HTML → server-side sanitization.** Saved and imported HTML now passes through an allowlist that matches the editor, so scripts, event handlers, iframes, and styles never reach the database.
 - **Generic save errors → specific recovery.** A 404 stops saving and links back, a 403 switches to read-only, a network failure retries every 5 seconds, and "All changes saved" appears only after the server confirms.
 - **Implicit requirements → written acceptance criteria.** `SUBMISSION.md` now maps each requirement to the test or manual step that verifies it, and `ARCHITECTURE.md` lists the permission matrix and failure scenarios.
+- Browser verification caught that opening a document triggered a save (Tiptap's setEditable emits an update by default), causing false edit conflicts. Fixed and added a regression check.
 - **Flaky test scripts.** Two failures were in test code, not the app (a click during navigation, and a helper that assumed every response was JSON). I fixed the tests and confirmed the app was correct.
 
 ## How I verified it
