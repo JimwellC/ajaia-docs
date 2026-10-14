@@ -37,23 +37,23 @@ export default function SignInButtons({ users }: { users: User[] }) {
   }
 
   return (
-    <div className="mt-8 space-y-3">
+    <div className="mt-8 space-y-2">
       {[...users].sort((a, b) => order(a.id) - order(b.id)).map((u) => (
         <button
           key={u.id}
           onClick={() => signIn(u.id)}
           disabled={pending !== null}
-          className="flex w-full items-center justify-between rounded-xl border border-stone-300 bg-white px-4 py-3 text-left transition hover:border-stone-500 disabled:opacity-60"
+          className="flex w-full items-center justify-between rounded-lg bg-sidebar px-4 py-3 text-left transition hover:bg-hover disabled:opacity-60"
         >
           <span>
             <span className="block font-medium">{u.name}</span>
-            {DEMO_ROLES[u.id] && <span className="block text-sm text-stone-700">{DEMO_ROLES[u.id]}</span>}
-            <span className="block text-sm text-stone-500">{u.email}</span>
+            {DEMO_ROLES[u.id] && <span className="block text-sm text-ink">{DEMO_ROLES[u.id]}</span>}
+            <span className="block text-sm text-ink-muted">{u.email}</span>
           </span>
-          <span className="text-sm text-stone-500">{pending === u.id ? "Signing in…" : "Continue →"}</span>
+          <span className="shrink-0 text-sm text-ink-muted">{pending === u.id ? "Signing in…" : "Continue →"}</span>
         </button>
       ))}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </div>
   );
 }

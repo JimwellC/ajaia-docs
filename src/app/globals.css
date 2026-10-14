@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Warm neutral palette: writing-first, low contrast chrome, high contrast text. */
+@theme {
+  --color-ink: #37352f;        /* body text */
+  --color-ink-muted: #6b6965;  /* secondary text, 4.5:1 or better on white and on the sidebar */
+  --color-sidebar: #f7f7f5;
+  --color-hover: #efefed;
+  --color-selected: #e8e7e4;
+  --color-line: #e9e9e7;       /* subtle borders */
+}
+
 /* Visible keyboard focus on every interactive element. In the base layer so a component can refine it with utilities. */
 @layer base {
   a:focus-visible,
@@ -8,21 +18,24 @@
   select:focus-visible,
   textarea:focus-visible,
   [tabindex]:not([tabindex="-1"]):focus-visible {
-    outline: 2px solid #1c1917;
+    outline: 2px solid var(--color-ink);
     outline-offset: 2px;
   }
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--color-ink);
+  background: #fff;
 }
 
 /* Editor content styles (Tiptap renders plain HTML elements) */
 .doc-content {
   outline: none;
-  min-height: 60vh;
+  min-height: 50vh;
   line-height: 1.7;
   font-size: 1rem;
+  padding-bottom: 30vh;
 }
 .doc-content h1 { font-size: 1.875rem; font-weight: 700; margin: 1.25rem 0 0.5rem; line-height: 1.25; }
 .doc-content h2 { font-size: 1.4rem; font-weight: 650; margin: 1.1rem 0 0.4rem; line-height: 1.3; }
@@ -31,14 +44,16 @@ body {
 .doc-content ul { list-style: disc; padding-left: 1.5rem; margin: 0.4rem 0; }
 .doc-content ol { list-style: decimal; padding-left: 1.5rem; margin: 0.4rem 0; }
 .doc-content li p { margin: 0.1rem 0; }
-.doc-content blockquote { border-left: 3px solid #d6d3d1; padding-left: 1rem; color: #57534e; }
-.doc-content code { background: #f5f5f4; padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.9em; }
-.doc-content pre { background: #1c1917; color: #fafaf9; padding: 0.9rem; border-radius: 8px; overflow-x: auto; }
+.doc-content blockquote { border-left: 3px solid var(--color-ink); padding-left: 1rem; }
+.doc-content code { background: rgba(135, 131, 120, 0.15); color: #b4413a; padding: 0.1rem 0.3rem; border-radius: 4px; font-size: 0.875em; }
+.doc-content pre { background: var(--color-sidebar); color: var(--color-ink); padding: 1rem; border-radius: 4px; overflow-x: auto; }
+.doc-content pre code { font-size: 0.875rem; }
+.doc-content hr { border: 0; border-top: 1px solid var(--color-line); margin: 1rem 0; }
 .doc-content pre code { background: none; padding: 0; color: inherit; }
-.doc-content a { color: #1d4ed8; text-decoration: underline; }
+.doc-content a { color: inherit; text-decoration: underline; text-decoration-color: rgba(55, 53, 47, 0.4); text-underline-offset: 2px; }
 .doc-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #a8a29e;
+  color: #9b9a97;
   float: left;
   height: 0;
   pointer-events: none;

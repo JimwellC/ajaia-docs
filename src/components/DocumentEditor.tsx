@@ -1,14 +1,19 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
+import { ChevronDown, Download, Share2 } from "lucide-react";
 import Toolbar from "./Toolbar";
 import SharePanel from "./SharePanel";
+import Popover from "./Popover";
+import { DownloadLinks } from "./DocMenu";
+import { NavButton } from "./AppShell";
 import { useDocumentSaver, type SaveState } from "./useDocumentSaver";
-import { api } from "@/lib/api";
+import { useNow } from "./useNow";
 import { editorExtensions } from "@/lib/editorExtensions";
+import { relativeTime } from "@/lib/time";
 import type { Role } from "@/lib/access";
 import type { Collaborator } from "@/server/repo";
 
@@ -19,15 +24,13 @@ interface Props {
     content: string;
     version: number;
     ownerName: string;
+    updatedAt: string;
     collaborators: Collaborator[];
   };
   role: Role;
 }
 
-const STATUS: Record<SaveState, string> = {
-  saved: "All changes saved",
-  dirty: "Unsaved changes",
-  saving: "Saving…",
+const FAILURE: Partial<Record<SaveState, string>> = {
   error: "Couldn't save.",
   offline: "Can't reach the server. Your changes are kept here and will retry automatically.",
   conflict: "Not saved: edit conflict",
@@ -35,14 +38,23 @@ const STATUS: Record<SaveState, string> = {
   readonly: "Not saved",
 };
 
+const SAVED_LABEL_MS = 60_000; // show "Saved" for a minute after a confirmed save, then "Edited … ago"
+
+const topButton = "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-ink hover:bg-hover";
+
 export default function DocumentEditor({ doc, role }: Props) {
   const router = useRouter();
+  const now = useNow();
   const [title, setTitle] = useState(doc.title);
   const [titleError, setTitleError] = useState("");
   const [linkOpen, setLinkOpen] = useState(false);
-  const saver = useDocumentSaver(doc.id, doc.version);
+  const header = useRef<HTMLElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(48);
+  // A renamed document should update in the sidebar and lists.
+  const saver = useDocumentSaver(doc.id, doc.version, { onSaved: (patch) => patch.title !== undefined && router.refresh() });
   // A 403 on save means an owner downgraded us to viewer while we were editing.
   const readOnly = role === "viewer" || saver.state === "readonly";
+  const section = role === "owner" ? "Private" : "Shared";
 
   const editor = useEditor({
     extensions: [...editorExtensions, Placeholder.configure({ placeholder: readOnly ? "" : "Start writing…" })],
@@ -69,6 +81,15 @@ export default function DocumentEditor({ doc, role }: Props) {
     if (editor && editor.isEditable === readOnly) editor.setEditable(!readOnly, false);
   }, [editor, readOnly]);
 
+  // The toolbar sticks just below the top bar, whose height changes when it wraps on narrow screens.
+  useEffect(() => {
+    const el = header.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   function commitTitle() {
     const next = title.trim();
     if (!next) {
@@ -91,46 +112,113 @@ export default function DocumentEditor({ doc, role }: Props) {
     saver.keepMine({ title: title.trim() || doc.title, content: editor?.getHTML() ?? "" });
   }
 
-  return (
-    <main className="mx-auto grid max-w-6xl gap-6 px-6 py-6 lg:grid-cols-[1fr_280px]">
-      <div className="min-w-0">
-        <div className="mb-3 flex items-center justify-between gap-3 text-sm">
-          <Link href="/" className="text-stone-600 hover:text-stone-900">← All documents</Link>
-          {!readOnly && (
-            <span
-              className={["error", "offline", "conflict", "gone"].includes(saver.state) ? "text-red-700" : "text-stone-600"}
-              aria-live="polite"
-            >
-              {saver.state === "error" ? saver.error || STATUS.error : STATUS[saver.state]}{" "}
-              {(saver.state === "error" || saver.state === "offline") && (
-                <button className="underline" onClick={() => void saver.flush()}>Retry</button>
-              )}
-            </span>
-          )}
-        </div>
+  const failure = FAILURE[saver.state];
+  let status = "";
+  if (failure) status = saver.state === "error" ? saver.error || failure : failure;
+  else if (saver.state === "dirty" || saver.state === "saving") status = "Saving…";
+  else if (saver.lastSavedAt && (now === null || now - saver.lastSavedAt < SAVED_LABEL_MS)) status = "Saved";
+  else if (now !== null) status = `Edited ${relativeTime(saver.lastSavedAt ?? doc.updatedAt, now)}`;
 
+  return (
+    <>
+      <header ref={header} className="sticky top-0 z-20 flex flex-wrap items-center gap-x-1 gap-y-1 bg-white px-3 py-2 sm:flex-nowrap">
+        <NavButton />
+        <nav aria-label="Breadcrumb" className="min-w-0 flex-1 px-1">
+          <ol className="flex min-w-0 items-center gap-1.5 text-sm">
+            <li className="shrink-0">
+              <Link href={`/?view=${section.toLowerCase()}`} className="rounded px-1 text-ink-muted hover:bg-hover">
+                {section}
+              </Link>
+            </li>
+            <li aria-hidden="true" className="text-ink-muted">
+              /
+            </li>
+            <li className="min-w-0 truncate" aria-current="page">
+              {title.trim() || doc.title}
+            </li>
+          </ol>
+        </nav>
+        <span
+          aria-live="polite"
+          className={`order-last basis-full px-1 text-sm sm:order-none sm:basis-auto sm:pr-2 ${failure ? "text-red-700" : "text-ink-muted"}`}
+        >
+          {status}
+          {(saver.state === "error" || saver.state === "offline") && (
+            <>
+              {" "}
+              <button type="button" className="underline" onClick={() => void saver.flush()}>
+                Retry
+              </button>
+            </>
+          )}
+        </span>
+        <Popover
+          buttonContent={
+            <>
+              <Download size={15} aria-hidden="true" />
+              <span className="hidden sm:inline">Download</span>
+              <span className="sr-only sm:hidden">Download</span>
+              <ChevronDown size={14} aria-hidden="true" className="text-ink-muted" />
+            </>
+          }
+          buttonClassName={topButton}
+          panelLabel="Download"
+          width={232}
+        >
+          {(close) => <DownloadLinks docId={doc.id} onPick={close} />}
+        </Popover>
+        <Popover
+          buttonContent={
+            <>
+              <Share2 size={15} aria-hidden="true" /> Share
+            </>
+          }
+          buttonClassName={topButton}
+          panelRole="dialog"
+          panelLabel="Share"
+          width={320}
+        >
+          {() =>
+            role === "owner" ? (
+              <SharePanel docId={doc.id} initial={doc.collaborators} />
+            ) : (
+              <div className="p-3">
+                <p className="font-medium">Shared with you</p>
+                <p className="mt-1 text-ink-muted">
+                  Owned by {doc.ownerName}. You can {role === "editor" && !readOnly ? "edit" : "view"} this document.
+                </p>
+                <p className="mt-1 text-ink-muted">Only the owner can change who has access.</p>
+              </div>
+            )
+          }
+        </Popover>
+      </header>
+
+      <main className="mx-auto w-full max-w-[720px] px-5 sm:px-8 md:px-0">
         {saver.state === "gone" && (
-          <div role="alert" className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          <div role="alert" className="mt-6 rounded-md bg-red-50 p-3 text-sm text-red-900">
             This document was deleted or you no longer have access.{" "}
-            <Link href="/" className="font-medium underline">Back to all documents</Link>
+            <Link href="/" className="font-medium underline">
+              Back to all documents
+            </Link>
           </div>
         )}
 
         {saver.state === "readonly" && (
-          <div role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <div role="alert" className="mt-6 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
             Your access changed to view-only. Your latest changes were not saved.
           </div>
         )}
 
         {saver.state === "conflict" && (
-          <div role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <div role="alert" className="mt-6 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-medium">Someone else saved changes to this document while you were editing.</p>
             <p className="mt-1">Your latest changes are not saved yet. Choose which version to keep:</p>
             <div className="mt-2 flex gap-2">
-              <button onClick={useTheirs} className="rounded-md border border-amber-400 bg-white px-3 py-1">
+              <button onClick={useTheirs} className="rounded-md bg-white px-3 py-1 ring-1 ring-amber-300 hover:bg-amber-100">
                 Load their version
               </button>
-              <button onClick={keepMine} className="rounded-md bg-amber-900 px-3 py-1 text-white">
+              <button onClick={keepMine} className="rounded-md bg-amber-900 px-3 py-1 text-white hover:bg-amber-950">
                 Keep mine
               </button>
             </div>
@@ -145,76 +233,27 @@ export default function DocumentEditor({ doc, role }: Props) {
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
           readOnly={readOnly}
           maxLength={120}
+          placeholder="Untitled"
           aria-label="Document title"
-          className="w-full rounded-md bg-transparent px-1 text-2xl font-bold outline-none read-only:cursor-default hover:bg-white focus:bg-white focus:ring-2 focus:ring-stone-500 read-only:hover:bg-transparent read-only:focus:ring-0"
+          className="mt-10 w-full rounded-md bg-transparent text-[2.25rem] font-bold leading-tight tracking-tight outline-none placeholder:text-[#a5a29c] read-only:cursor-default focus-visible:ring-2 focus-visible:ring-ink-muted/60 sm:mt-14 sm:text-[2.5rem]"
         />
-        {titleError && <p className="mt-1 text-sm text-red-700" role="alert">{titleError}</p>}
+        {titleError && (
+          <p className="mt-1 text-sm text-red-700" role="alert">
+            {titleError}
+          </p>
+        )}
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+        <div className="mt-4">
           {readOnly ? (
-            <div className="border-b border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600">
-              View only. Ask {doc.ownerName} for edit access.
-            </div>
+            <p className="border-b border-line pb-2 text-sm text-ink-muted">View only. Ask {doc.ownerName} for edit access.</p>
           ) : (
-            <Toolbar editor={editor} linkOpen={linkOpen} setLinkOpen={setLinkOpen} />
+            <Toolbar editor={editor} linkOpen={linkOpen} setLinkOpen={setLinkOpen} stickyTop={headerHeight} />
           )}
-          <div className="px-8 py-6 sm:px-12">
+          <div className="pt-4">
             <EditorContent editor={editor} />
           </div>
         </div>
-      </div>
-
-      <aside className="space-y-4">
-        <div className="rounded-xl border border-stone-200 bg-white p-4 text-sm">
-          <p className="text-stone-500">Owner</p>
-          <p className="font-medium">{role === "owner" ? "You" : doc.ownerName}</p>
-          {role !== "owner" && (
-            <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-amber-800">
-              Shared with you · {role === "editor" && !readOnly ? "can edit" : "can view"}
-            </p>
-          )}
-          {role === "owner" && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <DeleteButton docId={doc.id} onDeleted={() => router.push("/")} />
-            </div>
-          )}
-        </div>
-        {role === "owner" && <SharePanel docId={doc.id} initial={doc.collaborators} />}
-      </aside>
-    </main>
-  );
-}
-
-function DeleteButton({ docId, onDeleted }: { docId: string; onDeleted: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function remove() {
-    setBusy(true);
-    try {
-      await api(`/api/documents/${docId}`, { method: "DELETE" });
-      onDeleted();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  }
-
-  if (!confirming)
-    return (
-      <button onClick={() => setConfirming(true)} className="rounded-md border border-stone-300 px-3 py-1.5 text-red-700 hover:bg-red-50">
-        Delete
-      </button>
-    );
-  return (
-    <span className="flex w-full flex-wrap items-center gap-2">
-      <span className="text-stone-600">Delete for everyone?</span>
-      <button disabled={busy} onClick={remove} className="rounded-md bg-red-700 px-3 py-1.5 text-white disabled:opacity-60">
-        {busy ? "Deleting…" : "Delete"}
-      </button>
-      <button onClick={() => setConfirming(false)} className="underline">Cancel</button>
-      {error && <span className="w-full text-red-600">{error}</span>}
-    </span>
+      </main>
+    </>
   );
 }

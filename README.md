@@ -6,7 +6,7 @@ A lightweight collaborative document editor. Create, format, rename, import, and
 
 ## Demo accounts
 
-Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on the welcome document) and use **Switch user** to change accounts.
+Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on the welcome document) and use **Switch user** at the bottom of the sidebar to change accounts.
 
 | User | Email | On the seeded "Welcome to Ajaia Docs" document |
 |---|---|---|
@@ -17,12 +17,15 @@ Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on
 **Try this (3 minutes):**
 
 1. As **Jimwell Calma**, create a document, format it, and share it with `jim@ajaia.test` (Can edit).
-2. **Switch user** to **Jim**: it appears under **Shared with me** and Jim can edit it.
+2. **Switch user** to **Jim**: it appears in the sidebar under **Shared** and Jim can edit it.
 3. Switch to **JC** and open the welcome document: it is read-only. Open Jimwell's new document URL: "Document not found".
 4. **Edit conflict:** open the same document as Jimwell and Jim in two browsers (one normal, one private window). Save an edit as Jim, then type as Jimwell: Jimwell gets a warning and chooses which version to keep.
 
 ## Features
 
+- **Writing-first layout:** a collapsible sidebar (a drawer on phones) lists your **Private** documents and those **Shared** with you, each with a ⋯ menu to open, download, or delete. The editor is a centered column with an inline title, a light sticky toolbar, and a top bar with the breadcrumb, save status, Download, and Share.
+- **Home:** a greeting, quick "New document" and "Import file" actions, search by title, and a table of documents (name, owner, your access, last edited) filtered by All, Private, or Shared (kept in the URL)
+- **Download** any document you can view as Markdown or plain text
 - Create, rename, edit, reopen, and delete documents
 - Rich text: headings (H1 to H3), bold, italic, underline, strikethrough, inline code, links, bulleted and numbered lists, quotes, code blocks, dividers, undo and redo, with keyboard shortcuts and Markdown-style typing shortcuts
 - Autosave with a visible status, retry on failure, and a warning before leaving with unsaved changes
@@ -55,8 +58,8 @@ npm test                 # unit tests; add TEST_DATABASE_URL to also run API int
 TEST_DATABASE_URL=postgresql://... npm test
 ```
 
-- **Unit tests:** access rules, request validation, file import, HTML sanitization, and a check that the editor's output passes the sanitizer unchanged
-- **Integration tests:** call the real route handlers against a real Postgres database, covering sessions, editing, edit conflicts, every permission level, sharing validation, import, sanitization, and the health check. They use a separate database that gets reset before each test.
+- **Unit tests:** access rules, request validation, file import, HTML sanitization, a check that the editor's output passes the sanitizer unchanged, Markdown and plain text export, and relative times
+- **Integration tests:** call the real route handlers against a real Postgres database, covering sessions, editing, edit conflicts, every permission level, sharing validation, import, download, sanitization, and the health check. They use a separate database that gets reset before each test.
 - **CI:** GitHub Actions runs lint, type check, all tests against a Postgres service, and a production build on every push.
 
 ## Deploy (Vercel + Neon, both free)
@@ -95,7 +98,8 @@ src/server/
 src/lib/editorExtensions.ts  The editor's formatting scope, kept identical to the sanitizer allowlist
 src/lib/linkUrl.ts        Link URL rules (http, https, mailto) shared by the editor and the sanitizer
 src/app/api/              Thin route handlers: parse, call a service, respond
-src/components/           Editor, save queue hook, toolbar, share panel, document list
+src/components/           App shell and sidebar, home dashboard, editor, save queue hook, toolbar, share panel, menus
+src/server/export.ts      HTML to Markdown and plain text for downloads
 tests/unit/               Pure logic tests
 tests/integration/        API tests against Postgres
 .github/workflows/ci.yml  CI pipeline

@@ -7,6 +7,7 @@ import * as share from "@/app/api/documents/[id]/shares/[userId]/route";
 import * as importRoute from "@/app/api/import/route";
 import * as session from "@/app/api/session/route";
 import * as health from "@/app/api/health/route";
+import * as exportRoute from "@/app/api/documents/[id]/export/route";
 import { getPool } from "@/lib/db";
 import { JIMWELL, JIM, JC, call, resetDb, sessionCookie } from "./helpers";
 
@@ -152,6 +153,34 @@ describe.skipIf(!hasDb)("documents API", () => {
     expect(doc.body.title).toBe("team notes");
     expect(doc.body.content).toContain("<strong>one</strong>");
     expect(doc.body.content).toContain("<h1>Notes</h1>");
+  });
+
+  it("downloads a document as Markdown and as plain text", async () => {
+    const id = await createDoc(JIMWELL, "Q4 plan");
+    const html = "<h1>Goals</h1><p><strong>Ship</strong> it</p><ul><li><p>one</p></li></ul>";
+    await call(document.PATCH, { method: "PATCH", as: JIMWELL, params: { id }, json: { content: html, version: 1 } });
+
+    const md = await call(exportRoute.GET, { as: JIMWELL, params: { id }, url: "?format=md" });
+    expect(md.status).toBe(200);
+    expect(md.headers.get("content-type")).toBe("text/markdown; charset=utf-8");
+    expect(md.headers.get("content-disposition")).toBe(`attachment; filename="Q4 plan.md"; filename*=UTF-8''Q4%20plan.md`);
+    expect(md.raw).toBe("# Q4 plan\n\n# Goals\n\n**Ship** it\n\n- one\n");
+
+    const txt = await call(exportRoute.GET, { as: JIMWELL, params: { id }, url: "?format=txt" });
+    expect(txt.status).toBe(200);
+    expect(txt.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(txt.headers.get("content-disposition")).toContain('filename="Q4 plan.txt"');
+    expect(txt.raw).toBe("Q4 plan\n\nGoals\n\nShip it\n\n• one\n");
+
+    expect((await call(exportRoute.GET, { as: JIMWELL, params: { id }, url: "?format=pdf" })).status).toBe(400);
+  });
+
+  it("lets a viewer download and hides the document from non-members", async () => {
+    const id = await createDoc(JIMWELL, "Shared notes");
+    await call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json: { email: "jim@ajaia.test", role: "viewer" } });
+    expect((await call(exportRoute.GET, { as: JIM, params: { id }, url: "?format=md" })).status).toBe(200);
+    expect((await call(exportRoute.GET, { as: JC, params: { id }, url: "?format=md" })).status).toBe(404);
+    expect((await call(exportRoute.GET, { params: { id }, url: "?format=md" })).status).toBe(401);
   });
 
   it("rejects unsupported uploads and malformed JSON", async () => {

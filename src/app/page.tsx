@@ -1,27 +1,23 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { listDocuments } from "@/server/documents";
-import Header from "@/components/Header";
-import DocumentList from "@/components/DocumentList";
-import CreateActions from "@/components/CreateActions";
+import AppShell from "@/components/AppShell";
+import HomeDashboard, { type View } from "@/components/HomeDashboard";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+const VIEWS: View[] = ["all", "private", "shared"];
+
+export default async function Home({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const { owned, shared } = await listDocuments(user.id);
+  const requested = (await searchParams).view as View | undefined;
+  const initialView = requested && VIEWS.includes(requested) ? requested : "all";
 
   return (
-    <>
-      <Header name={user.name} />
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <h1 className="text-2xl font-bold">Documents</h1>
-          <CreateActions />
-        </div>
-        <DocumentList owned={owned} shared={shared} />
-      </main>
-    </>
+    <AppShell user={user} owned={owned} shared={shared}>
+      <HomeDashboard userName={user.name} owned={owned} shared={shared} initialView={initialView} />
+    </AppShell>
   );
 }

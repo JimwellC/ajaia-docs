@@ -5,6 +5,7 @@ import { fileToDocument } from "@/lib/importFile";
 import { AppError, notFound } from "./errors";
 import * as repo from "./repo";
 import { sanitizeDocumentHtml } from "./sanitize";
+import { contentDisposition, EXPORT_FORMATS, renderExport, type ExportFormat } from "./export";
 
 /** Loads a document with its grants. Missing and inaccessible look the same, so ids don't leak. */
 async function loadForUser(docId: string, userId: string) {
@@ -90,4 +91,14 @@ export async function removeShare(docId: string, userId: string, targetId: strin
 export async function importDocument(userId: string, filename: string, bytes: Buffer) {
   const { title, html } = await fileToDocument(filename, bytes);
   return repo.insertDocument(userId, title, sanitizeDocumentHtml(html));
+}
+
+/** A downloadable copy of a document. Anyone who can view it may download it; others get 404. */
+export async function exportDocument(docId: string, userId: string, format: ExportFormat) {
+  const { doc } = await loadForUser(docId, userId);
+  return {
+    body: renderExport(doc.title, doc.content, format),
+    contentType: EXPORT_FORMATS[format].contentType,
+    disposition: contentDisposition(doc.title, format),
+  };
 }

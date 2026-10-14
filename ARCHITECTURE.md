@@ -15,7 +15,7 @@ The one stretch item I chose is view vs edit roles, because it deepens permissio
 
 - **Real-time co-editing.** I've built real-time systems before (live bidding over Socket.IO and Redis), so I know what doing it properly costs: CRDTs such as Yjs, a websocket server, presence, and reconnection handling. That isn't a responsible fit for this timebox. Instead I made concurrent editing *safe*: conflicting saves are detected and the user decides. Nobody loses work, at a fraction of the complexity.
 - **Real authentication.** The brief allows mocked users, so sign-in is a demo picker. It still issues a real server-side session, and every permission check runs against that session, so real auth would only change how a session gets issued.
-- **Comments, version history, export.** Useful, but each widens the product without strengthening the core. The `version` column is a natural base for history later.
+- **Comments and version history.** Useful, but each widens the product without strengthening the core. The `version` column is a natural base for history later.
 
 ## Request flow
 
@@ -56,7 +56,7 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 | Scenario | Expected behavior |
 |---|---|
 | Refresh while saving | The browser warns before leaving while a save is pending or in flight. A request already sent still completes on the server. |
-| Save fails | The server's message is shown with a Retry button. Changes stay in the editor and in the save queue, and "All changes saved" is not shown. |
+| Save fails | The server's message is shown with a Retry button. Changes stay in the editor and in the save queue, and "Saved" is not shown. |
 | API unavailable | "Can't reach the server. Your changes are kept here and will retry automatically." The save retries every 5 seconds until it succeeds, and the manual Retry button stays available. |
 | Saves finish out of order | Can't happen within one tab: title and content changes share one serialized queue with at most one request in flight, and each save carries the version it was based on. |
 | Two users save the same document | The second save is based on a stale version and gets 409 with the latest content. The editor offers "Load their version" or "Keep mine", so nothing is silently overwritten. |
@@ -80,7 +80,7 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 
 **Editor and sanitizer kept identical.** The editor's extension list lives in one file (`src/lib/editorExtensions.ts`) and the allowlist in another (`src/server/sanitize.ts`), each pointing to the other, and both use the same link rules (`src/lib/linkUrl.ts`). A unit test builds a document containing every supported node and mark, including links, renders it with the shared extension list, sanitizes it, and asserts the HTML is byte for byte unchanged. So nothing a user can create is silently lost on save, and nothing beyond it is ever stored. To keep the allowlist attribute free, code blocks carry no language and numbered lists always start at 1. Imports follow the same rules: unsupported Markdown such as images and tables keeps its readable text (alt text, cell text) and loses only the markup, while Markdown links and strikethrough import as real formatting.
 
-**Formatting scope.** Supported: paragraphs, H1 to H3, bold, italic, underline, strikethrough, bulleted and numbered lists, quotes, code blocks, inline code, dividers, line breaks, and links. Images, tables, colors, fonts, and alignment were left out deliberately: images need file storage, tables need a much larger schema and editing UI, and colors, fonts, and alignment need style attributes, any of which would weaken the strict allowlist.
+**Formatting scope.** The same set is used everywhere: the editor, the sanitizer, imports, and downloads. Supported: paragraphs, H1 to H3, bold, italic, underline, strikethrough, bulleted and numbered lists, quotes, code blocks, inline code, dividers, line breaks, and links. Images, tables, colors, fonts, and alignment were left out deliberately: images need file storage, tables need a much larger schema and editing UI, and colors, fonts, and alignment need style attributes, any of which would weaken the strict allowlist.
 
 **Deployment health check.** `GET /api/health` returns 200 only when the database answers and every file in `db/migrations` is recorded in `schema_migrations`; otherwise 503 with the pending names. It needs no sign-in and never echoes connection details. The README's deployment checklist runs migrations before deploying and confirms this endpoint after.
 
@@ -90,12 +90,16 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 
 ## UX and accessibility
 
+The interface is writing first: warm neutral colors, the system font, a sidebar instead of page chrome, and a centered 720px editing column with no card around it. The top bar keeps the save status visible ("Saving…", "Saved", "Edited 2 minutes ago", or a failure message). Times that depend on the viewer's clock (the greeting and relative times) render only after the page loads in the browser, so server and browser output never disagree.
+
+**Downloads.** `GET /api/documents/[id]/export?format=md|txt` uses the same access check as reading: anyone who can view the document can download it, everyone else gets 404. The stored HTML is already limited to the allowlist, so the converter (`src/server/export.ts`) only has to handle those formats. Markdown keeps every format except underline, which Markdown can't express, and escapes text that would otherwise turn into Markdown syntax. The filename comes from the title, with an ASCII fallback and the full UTF-8 name in `Content-Disposition`.
+
 Checked against a local production build with Playwright:
 
-- **axe scan** (`@axe-core/playwright`, all rules) of the sign-in page, both dashboard tabs, the editor as owner, the editor as viewer, the link popover showing an error, and the conflict banner. Before this pass it found 4 serious color contrast issues (gray status and helper text on the light gray page) and 1 moderate missing page heading on the editor. After darkening that text, and giving the editor page a visually hidden heading with the document title, every scanned state reports 0 violations of any severity.
-- **Keyboard only:** signing in, creating a document, typing, bold (Ctrl+B or ⌘B), adding a link (Ctrl+K or ⌘K opens the link popover), reaching the toolbar, and sharing all work without a mouse. Every element reached with Tab showed a visible focus ring.
-- **375px width:** sign-in, not found, both dashboard tabs, and the editor as owner and viewer have no horizontal page scroll. The header fits on one line, the toolbar scrolls sideways within itself, and the sharing panel stacks below the editor. See `docs/screenshots/09-mobile-editor.png` and `10-mobile-dashboard.png`.
-- **Failure states in a real browser:** offline with automatic retry, access downgraded to viewer, document deleted while editing, and an edit conflict resolved with "Load their version". See screenshots 06 to 08.
+- **axe scan** (`@axe-core/playwright`, all rules) of the sign-in page, the home page (All, Private, and Shared tabs, a search with no match, a ⋯ menu, and the delete confirmation), not found, the editor as owner, the Share popover as owner and as editor, the Download menu, the sidebar ⋯ menu, the link popover showing an error, the editor as viewer, the conflict banner, and the phone layout with the navigation drawer open. 0 critical or serious violations in every state. The one moderate finding (the home top bar outside a landmark) was fixed by making it a header, so every state now reports 0 violations of any severity.
+- **Keyboard only:** signing in, switching home tabs with the arrow keys (the URL updates), opening a document from the table with Enter, opening a ⋯ menu (focus moves into it and Escape returns it), creating a document, typing, bold, adding a link (Ctrl+K or ⌘K), reaching the toolbar, and sharing from the Share popover all work without a mouse. Every control reached with Tab showed a visible focus ring.
+- **375px width:** sign-in, home (All and Shared), an open ⋯ menu, the navigation drawer, the editor as owner and viewer, and the Share and Download popovers have no horizontal page scroll. The top bar fits, the toolbar scrolls sideways within itself, and the drawer closes after navigating. See `docs/screenshots/09-mobile-editor.png` and `10-mobile-dashboard.png`.
+- **Failure states in a real browser:** opening a document as owner and as editor sends no save (a regression check for a save on open bug), offline with automatic retry, access downgraded to viewer, document deleted while editing, and an edit conflict resolved with "Load their version". See screenshots 06 to 08.
 
 ## Data model
 

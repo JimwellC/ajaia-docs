@@ -34,13 +34,14 @@ export async function call(
     json?: unknown;
     params?: Record<string, string>;
     body?: BodyInit;
+    url?: string; // query string appended to the request URL, e.g. "?format=md"
   } = {},
 ) {
   const headers = new Headers();
   if (opts.as) headers.set("cookie", await sessionCookie(opts.as));
   if (opts.cookie) headers.set("cookie", opts.cookie);
   if (opts.json !== undefined) headers.set("content-type", "application/json");
-  const req = new Request("http://test.local/api", {
+  const req = new Request(`http://test.local/api${opts.url ?? ""}`, {
     method: opts.method ?? "GET",
     headers,
     body: opts.json !== undefined ? JSON.stringify(opts.json) : opts.body,

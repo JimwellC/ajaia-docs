@@ -30,8 +30,15 @@ const OFFLINE_RETRY_MS = 5000;
 
 type Outcome = "ok" | "offline" | "failed";
 
-export function useDocumentSaver(docId: string, initialVersion: number) {
+export function useDocumentSaver(
+  docId: string,
+  initialVersion: number,
+  options: { onSaved?: (patch: Patch) => void } = {},
+) {
   const [state, setState] = useState<SaveState>("saved");
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null); // last server-confirmed save
+  const onSaved = useRef(options.onSaved);
+  onSaved.current = options.onSaved;
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState<Latest | null>(null);
   const version = useRef(initialVersion);
@@ -60,7 +67,9 @@ export function useDocumentSaver(docId: string, initialVersion: number) {
         version.current = res.version;
         offline.current = false;
         setError("");
+        setLastSavedAt(Date.now());
         setState(pending.current ? "dirty" : "saved");
+        onSaved.current?.(patch);
         return "ok";
       } catch (e) {
         // Put the unsaved changes back (newer edits made during the request win).
@@ -146,5 +155,5 @@ export function useDocumentSaver(docId: string, initialVersion: number) {
     };
   }, [flush]);
 
-  return { state, error, conflict, schedule, flush, acceptTheirs, keepMine };
+  return { state, error, conflict, lastSavedAt, schedule, flush, acceptTheirs, keepMine };
 }
