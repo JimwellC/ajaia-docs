@@ -144,6 +144,20 @@ export function useDocumentSaver(
 
   const hasUnsaved = () => pending.current !== null || inFlight.current !== null;
 
+  // Used by live-update polling.
+  const getVersion = useCallback(() => version.current, []);
+  const isBusy = useCallback(() => hasUnsaved() || blocked.current, []);
+  /** Adopt a newer server version that was applied to the editor without saving. */
+  const adoptRemote = useCallback((v: number) => {
+    version.current = v;
+  }, []);
+  /** A poll found the document gone (404) or no longer editable (403): stop saving, same as a failed save. */
+  const stop = useCallback((reason: "gone" | "readonly") => {
+    blocked.current = true;
+    if (timer.current) clearTimeout(timer.current);
+    setState(reason);
+  }, []);
+
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsaved()) e.preventDefault();
@@ -155,5 +169,5 @@ export function useDocumentSaver(
     };
   }, [flush]);
 
-  return { state, error, conflict, lastSavedAt, schedule, flush, acceptTheirs, keepMine };
+  return { state, error, conflict, lastSavedAt, schedule, flush, acceptTheirs, keepMine, getVersion, isBusy, adoptRemote, stop };
 }

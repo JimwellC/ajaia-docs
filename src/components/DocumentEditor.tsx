@@ -10,7 +10,8 @@ import SharePanel from "./SharePanel";
 import Popover from "./Popover";
 import { DownloadLinks } from "./DocMenu";
 import { NavButton } from "./AppShell";
-import { useDocumentSaver, type SaveState } from "./useDocumentSaver";
+import { useDocumentSaver, type Latest, type SaveState } from "./useDocumentSaver";
+import { useLiveUpdates } from "./useLiveUpdates";
 import { useNow } from "./useNow";
 import { editorExtensions } from "@/lib/editorExtensions";
 import { relativeTime } from "@/lib/time";
@@ -38,6 +39,7 @@ const FAILURE: Partial<Record<SaveState, string>> = {
   readonly: "Not saved",
 };
 
+const REMOTE_LABEL_MS = 4000; // how long "Updated by another user" stays up
 const SAVED_LABEL_MS = 60_000; // show "Saved" for a minute after a confirmed save, then "Edited … ago"
 
 const topButton = "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-ink hover:bg-hover";
@@ -50,6 +52,9 @@ export default function DocumentEditor({ doc, role }: Props) {
   const [linkOpen, setLinkOpen] = useState(false);
   const header = useRef<HTMLElement>(null);
   const [headerHeight, setHeaderHeight] = useState(48);
+  const lastEditAt = useRef<number | null>(null);
+  const savedTitle = useRef(doc.title); // the title last committed or received; differs from `title` while typing one
+  const [remoteAt, setRemoteAt] = useState<number | null>(null);
   // A renamed document should update in the sidebar and lists.
   const saver = useDocumentSaver(doc.id, doc.version, { onSaved: (patch) => patch.title !== undefined && router.refresh() });
   // A 403 on save means an owner downgraded us to viewer while we were editing.
@@ -73,13 +78,41 @@ export default function DocumentEditor({ doc, role }: Props) {
         return false;
       },
     },
-    onUpdate: ({ editor }) => saver.schedule({ content: editor.getHTML() }),
+    onUpdate: ({ editor }) => {
+      lastEditAt.current = Date.now();
+      saver.schedule({ content: editor.getHTML() });
+    },
   });
 
   useEffect(() => {
     // emitUpdate=false: toggling editability must not look like an edit (that would trigger a save).
     if (editor && editor.isEditable === readOnly) editor.setEditable(!readOnly, false);
   }, [editor, readOnly]);
+
+  // Show other people's saved changes. Applying them never triggers a save (emitUpdate=false).
+  useLiveUpdates({
+    docId: doc.id,
+    enabled: !!editor && saver.state !== "gone" && saver.state !== "readonly",
+    getVersion: saver.getVersion,
+    isBusy: () => saver.isBusy() || title !== savedTitle.current,
+    lastEditAt: () => lastEditAt.current,
+    onRemote: applyRemote,
+    onStop: saver.stop,
+  });
+
+  useEffect(() => {
+    if (!remoteAt) return;
+    const id = setTimeout(() => setRemoteAt(null), REMOTE_LABEL_MS);
+    return () => clearTimeout(id);
+  }, [remoteAt]);
+
+  function applyRemote(latest: Latest) {
+    savedTitle.current = latest.title;
+    setTitle(latest.title);
+    editor?.commands.setContent(latest.content, false);
+    saver.adoptRemote(latest.version);
+    setRemoteAt(Date.now());
+  }
 
   // The toolbar sticks just below the top bar, whose height changes when it wraps on narrow screens.
   useEffect(() => {
@@ -98,24 +131,28 @@ export default function DocumentEditor({ doc, role }: Props) {
     }
     setTitleError("");
     if (next !== title) setTitle(next);
+    savedTitle.current = next;
     saver.schedule({ title: next }, 0);
   }
 
   function useTheirs() {
     const latest = saver.acceptTheirs();
     if (!latest) return;
+    savedTitle.current = latest.title;
     setTitle(latest.title);
     editor?.commands.setContent(latest.content, false);
   }
 
   function keepMine() {
-    saver.keepMine({ title: title.trim() || doc.title, content: editor?.getHTML() ?? "" });
+    savedTitle.current = title.trim() || doc.title;
+    saver.keepMine({ title: savedTitle.current, content: editor?.getHTML() ?? "" });
   }
 
   const failure = FAILURE[saver.state];
   let status = "";
   if (failure) status = saver.state === "error" ? saver.error || failure : failure;
   else if (saver.state === "dirty" || saver.state === "saving") status = "Saving…";
+  else if (remoteAt) status = "Updated by another user";
   else if (saver.lastSavedAt && (now === null || now - saver.lastSavedAt < SAVED_LABEL_MS)) status = "Saved";
   else if (now !== null) status = `Edited ${relativeTime(saver.lastSavedAt ?? doc.updatedAt, now)}`;
 
@@ -228,7 +265,10 @@ export default function DocumentEditor({ doc, role }: Props) {
         <h1 className="sr-only">{title || doc.title}</h1>
         <input
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            lastEditAt.current = Date.now();
+            setTitle(e.target.value);
+          }}
           onBlur={readOnly ? undefined : commitTitle}
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
           readOnly={readOnly}

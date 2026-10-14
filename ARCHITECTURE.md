@@ -13,7 +13,7 @@ The one stretch item I chose is view vs edit roles, because it deepens permissio
 
 ## Cut on purpose
 
-- **Real-time co-editing.** I've built real-time systems before (live bidding over Socket.IO and Redis), so I know what doing it properly costs: CRDTs such as Yjs, a websocket server, presence, and reconnection handling. That isn't a responsible fit for this timebox. Instead I made concurrent editing *safe*: conflicting saves are detected and the user decides. Nobody loses work, at a fraction of the complexity.
+- **Real-time co-editing.** I've built real-time systems before (live bidding over Socket.IO and Redis), so I know what doing it properly costs: CRDTs such as Yjs, a websocket server, presence, and reconnection handling. That isn't a responsible fit for this timebox. Instead I made concurrent editing *safe*: conflicting saves are detected and the user decides. Nobody loses work, at a fraction of the complexity. On top of that, an open document polls the server every 4 seconds while the tab is visible, so other people's *saved* changes appear within about 5 seconds. No websockets and no new dependencies.
 - **Real authentication.** The brief allows mocked users, so sign-in is a demo picker. It still issues a real server-side session, and every permission check runs against that session, so real auth would only change how a session gets issued.
 - **Comments and version history.** Useful, but each widens the product without strengthening the core. The `version` column is a natural base for history later.
 
@@ -62,6 +62,8 @@ Users without access get 404 rather than 403, so they can't tell whether a docum
 | Two users save the same document | The second save is based on a stale version and gets 409 with the latest content. The editor offers "Load their version" or "Keep mine", so nothing is silently overwritten. |
 | Document deleted elsewhere | The next save gets 404. Saving stops, the content stays on screen, and the editor shows "This document was deleted or you no longer have access." with a link back to all documents. |
 | Access revoked while editing | Removed entirely: same as deleted (404). Downgraded to viewer: the next save gets 403, the editor switches to read-only, and it shows "Your access changed to view-only. Your latest changes were not saved." |
+| Someone else saves while you have the document open | Within about 5 seconds the poll sees a newer version. If you have nothing unsaved and haven't typed for 2 seconds, the editor and title update in place without triggering a save, and the status shows "Updated by another user". Otherwise your work stays and the next save gets the conflict choice above. |
+| Poll fails | Unreachable server: ignored, the next poll tries again. 404: same as deleted. 403: same as downgraded to viewer. Polling pauses while the tab is hidden and checks once as soon as it is visible again. |
 | Forged session cookie | 401. The user is resolved only by looking up the session token, so a cookie holding a user id, an unknown token, or an expired token is rejected. |
 
 ## Key decisions
@@ -100,6 +102,7 @@ Checked against a local production build with Playwright:
 - **Keyboard only:** signing in, switching home tabs with the arrow keys (the URL updates), opening a document from the table with Enter, opening a ⋯ menu (focus moves into it and Escape returns it), creating a document, typing, bold, adding a link (Ctrl+K or ⌘K), reaching the toolbar, and sharing from the Share popover all work without a mouse. Every control reached with Tab showed a visible focus ring.
 - **375px width:** sign-in, home (All and Shared), an open ⋯ menu, the navigation drawer, the editor as owner and viewer, and the Share and Download popovers have no horizontal page scroll. The top bar fits, the toolbar scrolls sideways within itself, and the drawer closes after navigating. See `docs/screenshots/09-mobile-editor.png` and `10-mobile-dashboard.png`.
 - **Failure states in a real browser:** opening a document as owner and as editor sends no save (a regression check for a save on open bug), offline with automatic retry, access downgraded to viewer, document deleted while editing, and an edit conflict resolved with "Load their version". See screenshots 06 to 08.
+- **Live updates in a real browser** (local build on a throwaway Postgres): Jim types and saves, and the owner's and the viewer's editors show the text within 10 seconds (about 3 seconds in the run) with no save sent by either; opening and idling through a poll sends no save; an owner's offline edit is not replaced by polling and gets the conflict banner, and "Keep mine" saves; removing a viewer's access while they have the document open shows the "deleted or no access" message after the next poll.
 
 ## Data model
 
@@ -115,7 +118,9 @@ Deleting a document cascades to its shares. Deleting a user cascades to their se
 
 ## Known limitations
 
-- Last save is no longer silent, but two people can't see each other's cursor or edits live
+- Other people's changes appear only after they are saved, within about 5 seconds. There is no live keystroke co-editing, no cursors and no presence
+- An editor downgraded to viewer finds out on their next save (403), not from polling, since viewers may still read the document
+- Polling costs one small request per open document every 4 seconds while the tab is visible
 - Demo sign-in: anyone can pick any demo user (but they get a real session, and cookies can't be forged)
 - No rate limiting or audit log
 

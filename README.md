@@ -29,6 +29,7 @@ Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on
 - Create, rename, edit, reopen, and delete documents
 - Rich text: headings (H1 to H3), bold, italic, underline, strikethrough, inline code, links, bulleted and numbered lists, quotes, code blocks, dividers, undo and redo, with keyboard shortcuts and Markdown-style typing shortcuts
 - Autosave with a visible status, retry on failure, and a warning before leaving with unsaved changes
+- **Live updates:** while a document is open, saved changes from other people appear within about 5 seconds (polling every 4 seconds while the tab is visible). If you have unsaved edits or typed in the last 2 seconds, your work is never replaced; the next save uses the conflict check instead. Live keystroke co-editing and presence are out of scope.
 - **Edit conflict detection:** every save carries the version it was based on; stale saves are rejected and the user chooses "Load their version" or "Keep mine"
 - **Import** `.txt`, `.md`, and `.docx` (up to 2 MB) as a new editable document
 - **Sharing** by email with **Can edit** or **Can view** access, changeable or removable by the owner
@@ -58,7 +59,7 @@ npm test                 # unit tests; add TEST_DATABASE_URL to also run API int
 TEST_DATABASE_URL=postgresql://... npm test
 ```
 
-- **Unit tests:** access rules, request validation, file import, HTML sanitization, a check that the editor's output passes the sanitizer unchanged, Markdown and plain text export, and relative times
+- **Unit tests:** access rules, request validation, file import, HTML sanitization, a check that the editor's output passes the sanitizer unchanged, Markdown and plain text export, relative times, and when a live update may replace the editor's content
 - **Integration tests:** call the real route handlers against a real Postgres database, covering sessions, editing, edit conflicts, every permission level, sharing validation, import, download, sanitization, and the health check. They use a separate database that gets reset before each test.
 - **CI:** GitHub Actions runs lint, type check, all tests against a Postgres service, and a production build on every push.
 
