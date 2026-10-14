@@ -6,20 +6,20 @@ A lightweight collaborative document editor. Create, format, rename, import, and
 
 ## Demo accounts
 
-Sign-in is mocked: pick a user on the sign-in screen and use **Switch user** to change accounts.
+Sign-in is mocked: pick a user on the sign-in screen (each one shows its role on the welcome document) and use **Switch user** to change accounts.
 
 | User | Email | On the seeded "Welcome to Ajaia Docs" document |
 |---|---|---|
-| Alice Reyes | alice@ajaia.test | Owner |
-| Bob Santos | bob@ajaia.test | Can edit |
-| Carol Cruz | carol@ajaia.test | Can view (read-only) |
+| Jimwell Calma | jimwell@ajaia.test | Owner |
+| Jim | jim@ajaia.test | Can edit |
+| JC | jc@ajaia.test | Can view (read-only) |
 
 **Try this (3 minutes):**
 
-1. As **Alice**, create a document, format it, and share it with `bob@ajaia.test` (Can edit).
-2. **Switch user** to **Bob**: it appears under **Shared with me** and he can edit it.
-3. Switch to **Carol** and open the welcome document: it is read-only. Open Alice's new document URL: "Document not found".
-4. **Edit conflict:** open the same document as Alice and Bob in two browsers (one normal, one private window). Save an edit as Bob, then type as Alice: Alice gets a warning and chooses which version to keep.
+1. As **Jimwell Calma**, create a document, format it, and share it with `jim@ajaia.test` (Can edit).
+2. **Switch user** to **Jim**: it appears under **Shared with me** and Jim can edit it.
+3. Switch to **JC** and open the welcome document: it is read-only. Open Jimwell's new document URL: "Document not found".
+4. **Edit conflict:** open the same document as Jimwell and Jim in two browsers (one normal, one private window). Save an edit as Jim, then type as Jimwell: Jimwell gets a warning and chooses which version to keep.
 
 ## Features
 

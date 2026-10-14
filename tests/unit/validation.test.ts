@@ -27,8 +27,8 @@ describe("request validation", () => {
   });
 
   it("defaults share role to editor and validates email", () => {
-    expect(parse(shareSchema, { email: " bob@ajaia.test " })).toEqual({ email: "bob@ajaia.test", role: "editor" });
+    expect(parse(shareSchema, { email: " jim@ajaia.test " })).toEqual({ email: "jim@ajaia.test", role: "editor" });
     expect(fails(() => parse(shareSchema, { email: "not-an-email" }))).toBe("Enter a valid email address.");
-    expect(fails(() => parse(shareSchema, { email: "bob@ajaia.test", role: "admin" }))).toBeTruthy();
+    expect(fails(() => parse(shareSchema, { email: "jim@ajaia.test", role: "admin" }))).toBeTruthy();
   });
 });

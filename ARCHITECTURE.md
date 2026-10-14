@@ -33,7 +33,7 @@ Pages (server components) call the same service functions as the API, so the bro
 
 ## Authentication vs authorization
 
-**Authentication** answers "who is this?". The demo sign-in lets you pick a seeded user, but the server then issues a real session: a random 32 byte token stored in the `sessions` table with a 7 day expiry, sent back in an httpOnly, SameSite=Lax cookie that is Secure in production. The cookie never contains a user id. On every request, `src/server/auth.ts` looks the token up, and a missing, unknown, or expired token means 401. Signing out deletes the row, so an old token stops working immediately. A cookie forged to hold a user id such as `u_alice` is just an unknown token.
+**Authentication** answers "who is this?". The demo sign-in lets you pick a seeded user, but the server then issues a real session: a random 32 byte token stored in the `sessions` table with a 7 day expiry, sent back in an httpOnly, SameSite=Lax cookie that is Secure in production. The cookie never contains a user id. On every request, `src/server/auth.ts` looks the token up, and a missing, unknown, or expired token means 401. Signing out deletes the row, so an old token stops working immediately. A cookie forged to hold a user id such as `u_jimwell` is just an unknown token.
 
 **Authorization** answers "may this user do this?". Every check in `src/server/documents.ts` uses only the user resolved from that session. Ids in a request body or query are never trusted for identity: the API takes the document id from the URL and decides the caller's role from the database, so a client cannot claim to be someone else or claim a role it doesn't have.
 

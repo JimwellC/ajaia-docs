@@ -3,6 +3,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { User } from "@/lib/session";
 
+// What each seeded demo account can do with the welcome document, in display order.
+const DEMO_ROLES: Record<string, string> = {
+  u_jimwell: "Owner of the welcome doc",
+  u_jim: "Can edit the welcome doc",
+  u_jc: "Can view the welcome doc",
+};
+const order = (id: string) => {
+  const i = Object.keys(DEMO_ROLES).indexOf(id);
+  return i === -1 ? Infinity : i;
+};
+
 export default function SignInButtons({ users }: { users: User[] }) {
   const router = useRouter();
   const [pending, setPending] = useState<string | null>(null);
@@ -27,7 +38,7 @@ export default function SignInButtons({ users }: { users: User[] }) {
 
   return (
     <div className="mt-8 space-y-3">
-      {users.map((u) => (
+      {[...users].sort((a, b) => order(a.id) - order(b.id)).map((u) => (
         <button
           key={u.id}
           onClick={() => signIn(u.id)}
@@ -36,6 +47,7 @@ export default function SignInButtons({ users }: { users: User[] }) {
         >
           <span>
             <span className="block font-medium">{u.name}</span>
+            {DEMO_ROLES[u.id] && <span className="block text-sm text-stone-700">{DEMO_ROLES[u.id]}</span>}
             <span className="block text-sm text-stone-500">{u.email}</span>
           </span>
           <span className="text-sm text-stone-500">{pending === u.id ? "Signing in…" : "Continue →"}</span>

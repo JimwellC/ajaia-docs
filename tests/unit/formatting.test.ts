@@ -89,9 +89,9 @@ describe("markdown import formatting", () => {
   const importMd = async (md: string) => sanitizeDocumentHtml((await fileToDocument("x.md", Buffer.from(md))).html);
 
   it("keeps the readable text of unsupported syntax and drops only the markup", async () => {
-    const html = await importMd("Intro ![Flow diagram](https://x.test/a.png)\n\n| Name | Role |\n|---|---|\n| Alice | Owner |");
+    const html = await importMd("Intro ![Flow diagram](https://x.test/a.png)\n\n| Name | Role |\n|---|---|\n| Jimwell | Owner |");
     expect(html).toContain("Intro Flow diagram");
-    for (const word of ["Name", "Role", "Alice", "Owner"]) expect(html).toContain(word);
+    for (const word of ["Name", "Role", "Jimwell", "Owner"]) expect(html).toContain(word);
     expect(html).not.toMatch(/<(img|table|thead|tbody|tr|th|td)\b/);
   });
 

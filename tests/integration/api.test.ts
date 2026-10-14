@@ -8,11 +8,11 @@ import * as importRoute from "@/app/api/import/route";
 import * as session from "@/app/api/session/route";
 import * as health from "@/app/api/health/route";
 import { getPool } from "@/lib/db";
-import { ALICE, BOB, CAROL, call, resetDb, sessionCookie } from "./helpers";
+import { JIMWELL, JIM, JC, call, resetDb, sessionCookie } from "./helpers";
 
 const hasDb = Boolean(process.env.TEST_DATABASE_URL);
 
-async function createDoc(as = ALICE, title = "Plan") {
+async function createDoc(as = JIMWELL, title = "Plan") {
   const res = await call(documents.POST, { method: "POST", as, json: { title } });
   expect(res.status).toBe(201);
   return res.body.id as string;
@@ -29,20 +29,20 @@ describe.skipIf(!hasDb)("documents API", () => {
 
   it("rejects forged and expired session cookies", async () => {
     // A cookie holding a raw user id is not a session.
-    expect((await call(documents.GET, { cookie: `ajaia_session=${ALICE}` })).status).toBe(401);
-    expect((await call(documents.GET, { cookie: `ajaia_uid=${ALICE}` })).status).toBe(401);
+    expect((await call(documents.GET, { cookie: `ajaia_session=${JIMWELL}` })).status).toBe(401);
+    expect((await call(documents.GET, { cookie: `ajaia_uid=${JIMWELL}` })).status).toBe(401);
     expect((await call(documents.GET, { cookie: "ajaia_session=not-a-real-token" })).status).toBe(401);
-    expect((await call(documents.GET, { cookie: await sessionCookie(ALICE, { expired: true }) })).status).toBe(401);
+    expect((await call(documents.GET, { cookie: await sessionCookie(JIMWELL, { expired: true }) })).status).toBe(401);
   });
 
   it("signs in with a random token and signing out revokes it", async () => {
-    const signIn = await call(session.POST, { method: "POST", json: { userId: ALICE } });
+    const signIn = await call(session.POST, { method: "POST", json: { userId: JIMWELL } });
     expect(signIn.status).toBe(200);
     const setCookie = signIn.headers.get("set-cookie") ?? "";
     expect(setCookie).toMatch(/^ajaia_session=[A-Za-z0-9_-]{43};/);
     expect(setCookie).toMatch(/HttpOnly/i);
     expect(setCookie.toLowerCase()).toContain("samesite=lax");
-    expect(setCookie).not.toContain(ALICE);
+    expect(setCookie).not.toContain(JIMWELL);
     const cookie = setCookie.split(";")[0];
 
     expect((await call(documents.GET, { cookie })).status).toBe(200);
@@ -57,14 +57,14 @@ describe.skipIf(!hasDb)("documents API", () => {
   it("sanitizes saved and imported HTML", async () => {
     const id = await createDoc();
     const dirty = '<p onclick="x()">Hi</p><script>alert(1)</script><img src=x onerror=y()>';
-    const saved = await call(document.PATCH, { method: "PATCH", as: ALICE, params: { id }, json: { content: dirty, version: 1 } });
+    const saved = await call(document.PATCH, { method: "PATCH", as: JIMWELL, params: { id }, json: { content: dirty, version: 1 } });
     expect(saved.status).toBe(200);
-    expect((await call(document.GET, { as: ALICE, params: { id } })).body.content).toBe("<p>Hi</p>");
+    expect((await call(document.GET, { as: JIMWELL, params: { id } })).body.content).toBe("<p>Hi</p>");
 
     const form = new FormData();
     form.append("file", new File(['<script>alert(1)</script>\n\n**bold**'], "x.md", { type: "text/markdown" }));
-    const imported = await call(importRoute.POST, { method: "POST", as: ALICE, body: form });
-    const content = (await call(document.GET, { as: ALICE, params: { id: imported.body.id } })).body.content;
+    const imported = await call(importRoute.POST, { method: "POST", as: JIMWELL, body: form });
+    const content = (await call(document.GET, { as: JIMWELL, params: { id: imported.body.id } })).body.content;
     expect(content).toContain("<strong>bold</strong>");
     expect(content).not.toContain("<script");
   });
@@ -72,83 +72,83 @@ describe.skipIf(!hasDb)("documents API", () => {
   it("creates, edits and reopens a document with its formatting", async () => {
     const id = await createDoc();
     const html = "<h1>Goals</h1><p><strong>Ship</strong> <u>it</u></p><ul><li><p>one</p></li></ul>";
-    const saved = await call(document.PATCH, { method: "PATCH", as: ALICE, params: { id }, json: { content: html, version: 1 } });
+    const saved = await call(document.PATCH, { method: "PATCH", as: JIMWELL, params: { id }, json: { content: html, version: 1 } });
     expect(saved.status).toBe(200);
     expect(saved.body.version).toBe(2);
 
-    const reopened = await call(document.GET, { as: ALICE, params: { id } });
+    const reopened = await call(document.GET, { as: JIMWELL, params: { id } });
     expect(reopened.body).toMatchObject({ title: "Plan", content: html, version: 2, role: "owner" });
   });
 
   it("rejects a save based on a stale version and returns the latest content", async () => {
     const id = await createDoc();
-    await call(shares.POST, { method: "POST", as: ALICE, params: { id }, json: { email: "bob@ajaia.test" } });
+    await call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json: { email: "jim@ajaia.test" } });
 
-    // Alice and Bob both opened version 1. Bob saves first.
-    const bob = await call(document.PATCH, { method: "PATCH", as: BOB, params: { id }, json: { content: "<p>Bob</p>", version: 1 } });
-    expect(bob.status).toBe(200);
+    // Jimwell and Jim both opened version 1. Jim saves first.
+    const jim = await call(document.PATCH, { method: "PATCH", as: JIM, params: { id }, json: { content: "<p>Jim</p>", version: 1 } });
+    expect(jim.status).toBe(200);
 
-    const alice = await call(document.PATCH, { method: "PATCH", as: ALICE, params: { id }, json: { content: "<p>Alice</p>", version: 1 } });
-    expect(alice.status).toBe(409);
-    expect(alice.body.error.code).toBe("conflict");
-    expect(alice.body.error.latest).toMatchObject({ content: "<p>Bob</p>", version: 2 });
+    const jimwell = await call(document.PATCH, { method: "PATCH", as: JIMWELL, params: { id }, json: { content: "<p>Jimwell</p>", version: 1 } });
+    expect(jimwell.status).toBe(409);
+    expect(jimwell.body.error.code).toBe("conflict");
+    expect(jimwell.body.error.latest).toMatchObject({ content: "<p>Jim</p>", version: 2 });
 
-    // Bob's work was not overwritten.
-    const current = await call(document.GET, { as: ALICE, params: { id } });
-    expect(current.body.content).toBe("<p>Bob</p>");
+    // Jim's work was not overwritten.
+    const current = await call(document.GET, { as: JIMWELL, params: { id } });
+    expect(current.body.content).toBe("<p>Jim</p>");
   });
 
   it("enforces owner, editor, viewer and no-access permissions", async () => {
     const id = await createDoc();
-    await call(shares.POST, { method: "POST", as: ALICE, params: { id }, json: { email: "bob@ajaia.test", role: "viewer" } });
+    await call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json: { email: "jim@ajaia.test", role: "viewer" } });
 
     // Viewer can read but not write, share or delete.
-    expect((await call(document.GET, { as: BOB, params: { id } })).body.role).toBe("viewer");
-    const write = await call(document.PATCH, { method: "PATCH", as: BOB, params: { id }, json: { content: "x", version: 1 } });
+    expect((await call(document.GET, { as: JIM, params: { id } })).body.role).toBe("viewer");
+    const write = await call(document.PATCH, { method: "PATCH", as: JIM, params: { id }, json: { content: "x", version: 1 } });
     expect(write.status).toBe(403);
-    expect((await call(shares.POST, { method: "POST", as: BOB, params: { id }, json: { email: "carol@ajaia.test" } })).status).toBe(403);
-    expect((await call(document.DELETE, { method: "DELETE", as: BOB, params: { id } })).status).toBe(403);
+    expect((await call(shares.POST, { method: "POST", as: JIM, params: { id }, json: { email: "jc@ajaia.test" } })).status).toBe(403);
+    expect((await call(document.DELETE, { method: "DELETE", as: JIM, params: { id } })).status).toBe(403);
 
     // Upgrading to editor allows writing.
-    expect((await call(share.PATCH, { method: "PATCH", as: ALICE, params: { id, userId: BOB }, json: { role: "editor" } })).status).toBe(200);
-    expect((await call(document.PATCH, { method: "PATCH", as: BOB, params: { id }, json: { content: "x", version: 1 } })).status).toBe(200);
+    expect((await call(share.PATCH, { method: "PATCH", as: JIMWELL, params: { id, userId: JIM }, json: { role: "editor" } })).status).toBe(200);
+    expect((await call(document.PATCH, { method: "PATCH", as: JIM, params: { id }, json: { content: "x", version: 1 } })).status).toBe(200);
 
-    // Carol has no grant: the document looks like it doesn't exist.
-    expect((await call(document.GET, { as: CAROL, params: { id } })).status).toBe(404);
+    // JC has no grant: the document looks like it doesn't exist.
+    expect((await call(document.GET, { as: JC, params: { id } })).status).toBe(404);
 
     // Removing access takes effect immediately.
-    expect((await call(share.DELETE, { method: "DELETE", as: ALICE, params: { id, userId: BOB } })).status).toBe(204);
-    expect((await call(document.GET, { as: BOB, params: { id } })).status).toBe(404);
+    expect((await call(share.DELETE, { method: "DELETE", as: JIMWELL, params: { id, userId: JIM } })).status).toBe(204);
+    expect((await call(document.GET, { as: JIM, params: { id } })).status).toBe(404);
   });
 
   it("separates owned and shared documents in the list", async () => {
-    const id = await createDoc(ALICE, "Shared plan");
-    await createDoc(BOB, "Bob's own");
-    await call(shares.POST, { method: "POST", as: ALICE, params: { id }, json: { email: "BOB@ajaia.test", role: "viewer" } });
+    const id = await createDoc(JIMWELL, "Shared plan");
+    await createDoc(JIM, "Jim's own");
+    await call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json: { email: "JIM@ajaia.test", role: "viewer" } });
 
-    const list = await call(documents.GET, { as: BOB });
-    expect(list.body.owned.map((d: { title: string }) => d.title)).toEqual(["Bob's own"]);
-    expect(list.body.shared).toEqual([expect.objectContaining({ title: "Shared plan", ownerName: "Alice Reyes", role: "viewer" })]);
+    const list = await call(documents.GET, { as: JIM });
+    expect(list.body.owned.map((d: { title: string }) => d.title)).toEqual(["Jim's own"]);
+    expect(list.body.shared).toEqual([expect.objectContaining({ title: "Shared plan", ownerName: "Jimwell Calma", role: "viewer" })]);
   });
 
   it("validates sharing requests", async () => {
     const id = await createDoc();
-    const send = (json: unknown) => call(shares.POST, { method: "POST", as: ALICE, params: { id }, json });
+    const send = (json: unknown) => call(shares.POST, { method: "POST", as: JIMWELL, params: { id }, json });
     expect((await send({ email: "nobody@ajaia.test" })).status).toBe(404);
-    expect((await send({ email: "alice@ajaia.test" })).status).toBe(400);
-    expect((await send({ email: "bob@ajaia.test" })).status).toBe(201);
-    expect((await send({ email: "bob@ajaia.test" })).status).toBe(409);
+    expect((await send({ email: "jimwell@ajaia.test" })).status).toBe(400);
+    expect((await send({ email: "jim@ajaia.test" })).status).toBe(201);
+    expect((await send({ email: "jim@ajaia.test" })).status).toBe(409);
     expect((await send({ email: "oops" })).status).toBe(400);
   });
 
   it("imports a markdown file as a new editable document", async () => {
     const form = new FormData();
     form.append("file", new File(["# Notes\n\n- **one**\n- two"], "team notes.md", { type: "text/markdown" }));
-    const imported = await call(importRoute.POST, { method: "POST", as: ALICE, body: form });
+    const imported = await call(importRoute.POST, { method: "POST", as: JIMWELL, body: form });
     expect(imported.status).toBe(201);
 
     const id = imported.body.id;
-    const doc = await call(document.GET, { as: ALICE, params: { id } });
+    const doc = await call(document.GET, { as: JIMWELL, params: { id } });
     expect(doc.body.title).toBe("team notes");
     expect(doc.body.content).toContain("<strong>one</strong>");
     expect(doc.body.content).toContain("<h1>Notes</h1>");
@@ -157,12 +157,12 @@ describe.skipIf(!hasDb)("documents API", () => {
   it("rejects unsupported uploads and malformed JSON", async () => {
     const form = new FormData();
     form.append("file", new File(["x"], "photo.png"));
-    const upload = await call(importRoute.POST, { method: "POST", as: ALICE, body: form });
+    const upload = await call(importRoute.POST, { method: "POST", as: JIMWELL, body: form });
     expect(upload.status).toBe(415);
 
     const req = new Request("http://test.local/api", {
       method: "POST",
-      headers: { cookie: await sessionCookie(ALICE), "content-type": "application/json" },
+      headers: { cookie: await sessionCookie(JIMWELL), "content-type": "application/json" },
       body: "{not json",
     });
     const res = await documents.POST(req, { params: Promise.resolve({}) } as never);

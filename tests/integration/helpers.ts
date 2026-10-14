@@ -2,9 +2,9 @@ import { randomBytes } from "node:crypto";
 import { getPool } from "@/lib/db";
 import { seed } from "../../scripts/seed";
 
-export const ALICE = "u_alice";
-export const BOB = "u_bob";
-export const CAROL = "u_carol";
+export const JIMWELL = "u_jimwell";
+export const JIM = "u_jim";
+export const JC = "u_jc";
 
 export async function resetDb() {
   await getPool().query("TRUNCATE shares, documents, users CASCADE");

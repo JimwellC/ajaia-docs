@@ -22,9 +22,9 @@
 
 No passwords: pick a user on the sign-in screen.
 
-- `alice@ajaia.test`: owns the welcome document
-- `bob@ajaia.test`: can edit the welcome document
-- `carol@ajaia.test`: can only view the welcome document
+- `jimwell@ajaia.test` (Jimwell Calma): owns the welcome document
+- `jim@ajaia.test` (Jim): can edit the welcome document
+- `jc@ajaia.test` (JC): can only view the welcome document
 
 ## Acceptance criteria
 
@@ -38,7 +38,7 @@ No passwords: pick a user on the sign-in screen.
 | Import | `.txt`, `.md`, `.docx` become new editable documents; unsupported, empty, or oversized files are rejected; imported HTML is sanitized. | Unit: all tests in `tests/unit/importFile.test.ts`. Integration: "imports a markdown file as a new editable document", "rejects unsupported uploads and malformed JSON", "sanitizes saved and imported HTML". |
 | Share | The owner shares by email as editor or viewer; unknown emails, self shares, and duplicates are rejected. | Integration: "validates sharing requests". Unit: "only lets the owner share, and blocks self-shares and duplicates". |
 | Permissions | Owner, editor, viewer, and no access each get exactly the actions in the permission matrix in `ARCHITECTURE.md`, enforced on the server. | Integration: "enforces owner, editor, viewer and no-access permissions". Unit: all tests in `tests/unit/access.test.ts`. |
-| Ownership view | The document list separates "My documents" from "Shared with me" and shows each shared document's owner and role. | Integration: "separates owned and shared documents in the list". Manual: sign in as Bob and Carol on the live site. |
+| Ownership view | The document list separates "My documents" from "Shared with me" and shows each shared document's owner and role. | Integration: "separates owned and shared documents in the list". Manual: sign in as Jim and JC on the live site. |
 | Persistence | Documents, shares, and sessions live in Postgres and survive reloads and redeploys. | Integration tests run against a real Postgres database. Manual: reload the live site after a redeploy; the welcome document is unchanged. |
 | Testing | Lint, type check, unit tests, integration tests, and a production build pass. | `npm run lint`, `npm run typecheck`, `npm test` (25 unit, 14 integration), `npm run build`, all run by `.github/workflows/ci.yml` on every push. |
 | Deployment | The live URL serves the app with its production database, every migration is applied, and the sign-in page loads. | Integration: both health check tests. Manual: the README deployment checklist, ending with `/api/health` returning 200 and a sign-in smoke test. |

@@ -66,7 +66,7 @@ export default function SharePanel({ docId, initial }: { docId: string; initial:
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="bob@ajaia.test"
+          placeholder="jim@ajaia.test"
           className="w-full rounded-md border border-stone-300 px-2 py-1.5"
         />
         <div className="flex gap-2">
@@ -83,7 +83,7 @@ export default function SharePanel({ docId, initial }: { docId: string; initial:
             {busy ? "Sharing…" : "Share"}
           </button>
         </div>
-        <p className="text-xs text-stone-500">Demo users: alice@, bob@, carol@ajaia.test</p>
+        <p className="text-xs text-stone-500">Demo users: jimwell@, jim@, jc@ajaia.test</p>
         {error && <p className="text-red-600" role="alert">{error}</p>}
       </form>
 

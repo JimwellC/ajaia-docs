@@ -2,32 +2,32 @@ import { describe, expect, it } from "vitest";
 import { canEdit, canManage, canView, checkShare, getRole, type DocAccessInfo } from "@/lib/access";
 
 const doc: DocAccessInfo = {
-  ownerId: "alice",
+  ownerId: "jimwell",
   grants: [
-    { userId: "bob", role: "editor" },
-    { userId: "carol", role: "viewer" },
+    { userId: "jim", role: "editor" },
+    { userId: "jc", role: "viewer" },
   ],
 };
 
 describe("document access rules", () => {
   it("gives the owner full control", () => {
-    expect(getRole(doc, "alice")).toBe("owner");
-    expect(canEdit(doc, "alice")).toBe(true);
-    expect(canManage(doc, "alice")).toBe(true);
+    expect(getRole(doc, "jimwell")).toBe("owner");
+    expect(canEdit(doc, "jimwell")).toBe(true);
+    expect(canManage(doc, "jimwell")).toBe(true);
   });
 
   it("lets an editor view and edit, but not manage sharing", () => {
-    expect(getRole(doc, "bob")).toBe("editor");
-    expect(canView(doc, "bob")).toBe(true);
-    expect(canEdit(doc, "bob")).toBe(true);
-    expect(canManage(doc, "bob")).toBe(false);
+    expect(getRole(doc, "jim")).toBe("editor");
+    expect(canView(doc, "jim")).toBe(true);
+    expect(canEdit(doc, "jim")).toBe(true);
+    expect(canManage(doc, "jim")).toBe(false);
   });
 
   it("makes viewers read-only", () => {
-    expect(getRole(doc, "carol")).toBe("viewer");
-    expect(canView(doc, "carol")).toBe(true);
-    expect(canEdit(doc, "carol")).toBe(false);
-    expect(canManage(doc, "carol")).toBe(false);
+    expect(getRole(doc, "jc")).toBe("viewer");
+    expect(canView(doc, "jc")).toBe(true);
+    expect(canEdit(doc, "jc")).toBe(false);
+    expect(canManage(doc, "jc")).toBe(false);
   });
 
   it("denies everything to users without a grant", () => {
@@ -37,9 +37,9 @@ describe("document access rules", () => {
   });
 
   it("only lets the owner share, and blocks self-shares and duplicates", () => {
-    expect(checkShare(doc, "alice", "dave")).toEqual({ ok: true });
-    expect(checkShare(doc, "bob", "dave")).toEqual({ ok: false, reason: "not_owner" });
-    expect(checkShare(doc, "alice", "alice")).toEqual({ ok: false, reason: "self_share" });
-    expect(checkShare(doc, "alice", "carol")).toEqual({ ok: false, reason: "already_shared" });
+    expect(checkShare(doc, "jimwell", "dave")).toEqual({ ok: true });
+    expect(checkShare(doc, "jim", "dave")).toEqual({ ok: false, reason: "not_owner" });
+    expect(checkShare(doc, "jimwell", "jimwell")).toEqual({ ok: false, reason: "self_share" });
+    expect(checkShare(doc, "jimwell", "jc")).toEqual({ ok: false, reason: "already_shared" });
   });
 });
